@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import './App.css';
+import logo from './assests/Tazviro Technologies logo design.png';
 
 const APTITUDE_DURATION_SECONDS = 40 * 60;
 
@@ -28,6 +29,7 @@ const initialPasswordChange = {
 };
 
 const adminStorageKey = 'tazviro-admin-session';
+const configuredApiOrigin = (process.env.REACT_APP_API_URL || '').trim().replace(/\/$/, '');
 
 const assessmentRules = [
   'Each candidate can use only one email address and can attempt the assessment only once.',
@@ -111,11 +113,39 @@ function getApiAssetUrl(path) {
     return path;
   }
 
-  if (window.location.hostname === 'localhost' && window.location.port === '3000') {
-    return `http://localhost:5000${path}`;
+  if (configuredApiOrigin) {
+    return `${configuredApiOrigin}${path}`;
   }
 
   return path;
+}
+
+function buildApiUrl(path) {
+  if (!path || path.startsWith('http://') || path.startsWith('https://')) {
+    return path;
+  }
+
+  if (configuredApiOrigin) {
+    return `${configuredApiOrigin}${path}`;
+  }
+
+  return path;
+}
+
+async function enterFullscreenMode() {
+  if (!document.documentElement.requestFullscreen || document.fullscreenElement) {
+    return;
+  }
+
+  await document.documentElement.requestFullscreen();
+}
+
+async function exitFullscreenMode() {
+  if (!document.fullscreenElement || !document.exitFullscreen) {
+    return;
+  }
+
+  await document.exitFullscreen();
 }
 
 async function readResponsePayload(response) {
@@ -150,6 +180,12 @@ function App() {
   const [candidateBusy, setCandidateBusy] = useState(false);
   const [stream, setStream] = useState(null);
   const [recordingSaved, setRecordingSaved] = useState(false);
+  const [assessmentLocked, setAssessmentLocked] = useState(false);
+  const [assessmentTerminationReason, setAssessmentTerminationReason] = useState('');
+  const [assessmentSecurity, setAssessmentSecurity] = useState({
+    tabSwitches: 0,
+    fullscreenExits: 0,
+  });
 
   const [adminLogin, setAdminLogin] = useState(initialAdminLogin);
   const [adminCreate, setAdminCreate] = useState(initialAdminCreate);
@@ -174,7 +210,9 @@ function App() {
   const chunksRef = useRef([]);
   const autoSubmitTriggeredRef = useRef(false);
   const streamRef = useRef(null);
+  const terminationTriggeredRef = useRef(false);
 
+  const isAssessmentScreen = screen === 'aptitude' || screen === 'coding';
   const answeredCount = Object.keys(aptitudeAnswers).length;
   const canStart = form.name && form.email && form.mobile && form.designation && form.resume;
   const unansweredQuestions = useMemo(
@@ -302,7 +340,9 @@ function App() {
     setActiveCodingQuestionId('');
     setCandidateMessage('');
     setRecordingSaved(false);
+    setAssessmentTerminationReason('');
     autoSubmitTriggeredRef.current = false;
+    terminationTriggeredRef.current = false;
   };
 
   const saveAdminSession = (session) => {
@@ -321,7 +361,7 @@ function App() {
 
   const adminFetch = useCallback(async (url, options = {}, tokenOverride) => {
     const token = tokenOverride || adminSession?.token;
-    const response = await fetch(url, {
+    const response = await fetch(buildApiUrl(url), {
       ...options,
       headers: {
         'Content-Type': 'application/json',
@@ -415,7 +455,7 @@ function App() {
     const data = new FormData();
     data.append('cameraRecording', recording, `attempt-${attemptId}.webm`);
 
-    await fetch(`/api/attempts/${attemptId}/recording`, {
+    await fetch(buildApiUrl(`/api/attempts/${attemptId}/recording`), {
       method: 'POST',
       body: data,
     });
@@ -423,14 +463,119 @@ function App() {
     setRecordingSaved(true);
   }, [cleanupCamera, recordingSaved, stopCameraHardware]);
 
+  const terminateAssessment = useCallback(async (reason, violationType) => {
+    if (terminationTriggeredRef.current) {
+      return;
+    }
+
+    terminationTriggeredRef.current = true;
+    autoSubmitTriggeredRef.current = true;
+    setAssessmentLocked(true);
+    setCandidateBusy(true);
+    setAssessmentTerminationReason(reason);
+    setCandidateMessage(reason);
+
+    if (violationType === 'tab') {
+      setAssessmentSecurity((current) => ({
+        ...current,
+        tabSwitches: current.tabSwitches + 1,
+      }));
+    }
+
+    if (violationType === 'fullscreen') {
+      setAssessmentSecurity((current) => ({
+        ...current,
+        fullscreenExits: current.fullscreenExits + 1,
+      }));
+    }
+
+    try {
+      if (screen === 'aptitude' && attempt?.id) {
+        const response = await fetch(buildApiUrl(`/api/attempts/${attempt.id}/aptitude`), {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ answers: aptitudeAnswers }),
+        });
+
+        const result = await readResponsePayload(response);
+        if (response.ok) {
+          setAptitudeResult(result);
+        }
+      }
+
+      if (screen === 'coding' && attempt?.id) {
+        await stopCameraAndUpload(attempt.id);
+      }
+    } catch (_error) {
+      // Keep the termination local even if persistence fails.
+    } finally {
+      await exitFullscreenMode().catch(() => {});
+      setCandidateBusy(false);
+      setScreen('failed');
+    }
+  }, [aptitudeAnswers, attempt?.id, screen, stopCameraAndUpload]);
+
+  useEffect(() => {
+    if (!isAssessmentScreen) {
+      setAssessmentLocked(false);
+      terminationTriggeredRef.current = false;
+      exitFullscreenMode().catch(() => {});
+      return undefined;
+    }
+
+    const handleVisibilityChange = () => {
+      if (!document.hidden) {
+        return;
+      }
+
+      terminateAssessment('Tab switching is not allowed during the assessment. Your test has been ended.', 'tab');
+    };
+
+    const handleFullscreenChange = () => {
+      if (document.fullscreenElement) {
+        setAssessmentLocked(false);
+        return;
+      }
+
+      terminateAssessment('Exiting fullscreen is not allowed during the assessment. Your test has been ended.', 'fullscreen');
+    };
+
+    const handleBeforeUnload = (event) => {
+      event.preventDefault();
+      event.returnValue = '';
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    document.addEventListener('fullscreenchange', handleFullscreenChange);
+    window.addEventListener('beforeunload', handleBeforeUnload);
+
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      document.removeEventListener('fullscreenchange', handleFullscreenChange);
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+    };
+  }, [isAssessmentScreen, terminateAssessment]);
+
   const startAssessment = async (event) => {
     event.preventDefault();
     setCandidateMessage('');
     setCandidateBusy(true);
     setRecordingSaved(false);
     autoSubmitTriggeredRef.current = false;
+    terminationTriggeredRef.current = false;
+    setAssessmentTerminationReason('');
+    setAssessmentLocked(false);
+    setAssessmentSecurity({
+      tabSwitches: 0,
+      fullscreenExits: 0,
+    });
 
     try {
+      if (!document.documentElement.requestFullscreen) {
+        throw new Error('Fullscreen is required to start the test. Please use a supported browser.');
+      }
+
+      await enterFullscreenMode();
       await startCamera();
 
       const data = new FormData();
@@ -440,7 +585,7 @@ function App() {
       data.append('designation', form.designation);
       data.append('resume', form.resume);
 
-      const registerResponse = await fetch('/api/candidates', {
+      const registerResponse = await fetch(buildApiUrl('/api/candidates'), {
         method: 'POST',
         body: data,
       });
@@ -454,13 +599,14 @@ function App() {
       setAttempt(registered.attempt);
       setAptitudeTimeLeft(APTITUDE_DURATION_SECONDS);
 
-      const questionResponse = await fetch('/api/aptitude/questions');
+      const questionResponse = await fetch(buildApiUrl('/api/aptitude/questions'));
       const questionData = await readResponsePayload(questionResponse);
       setAptitudeQuestions(questionData.questions || []);
       setScreen('aptitude');
     } catch (error) {
+      await exitFullscreenMode().catch(() => {});
       cleanupCamera();
-      setCandidateMessage(error.message || 'Please allow camera and microphone access to continue.');
+      setCandidateMessage(error.message || 'Please allow fullscreen, camera, and microphone access to continue.');
     } finally {
       setCandidateBusy(false);
     }
@@ -475,7 +621,7 @@ function App() {
       return;
     }
 
-    const codingResponse = await fetch(`/api/coding/questions?designation=${encodeURIComponent(form.designation)}`);
+    const codingResponse = await fetch(buildApiUrl(`/api/coding/questions?designation=${encodeURIComponent(form.designation)}`));
     const codingData = await readResponsePayload(codingResponse);
     const questions = codingData.questions || [];
     setCodingQuestions(questions);
@@ -498,7 +644,7 @@ function App() {
     setCandidateMessage(autoSubmit ? 'Time is over. Your aptitude round is being submitted automatically.' : '');
 
     try {
-      const response = await fetch(`/api/attempts/${attempt.id}/aptitude`, {
+      const response = await fetch(buildApiUrl(`/api/attempts/${attempt.id}/aptitude`), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ answers: aptitudeAnswers }),
@@ -569,7 +715,7 @@ function App() {
     setCandidateMessage('');
 
     try {
-      const response = await fetch(`/api/attempts/${attempt.id}/coding`, {
+      const response = await fetch(buildApiUrl(`/api/attempts/${attempt.id}/coding`), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -599,7 +745,7 @@ function App() {
     setAdminMessage('');
 
     try {
-      const response = await fetch('/api/admin/login', {
+      const response = await fetch(buildApiUrl('/api/admin/login'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(adminLogin),
@@ -703,13 +849,12 @@ function App() {
         <div className="hero-copy">
           <p className="eyebrow">Tazviro Technologies</p>
           <h1>Welcome to Tazviro Technologies Hiring Portal</h1>
-          <p className="lead">
-            Collect candidate details, run the aptitude and coding assessment, and keep every result
-            available for the hiring team in one secure place.
-          </p>
         </div>
 
         <div className="status-panel" aria-live="polite">
+          <div className="status-panel-logo-wrap">
+            <img className="status-panel-logo" src={logo} alt="Tazviro Technologies logo" />
+          </div>
           <span>{screen.startsWith('admin') ? 'Admin portal' : candidateProgressLabel}</span>
           <strong>
             {screen.startsWith('admin')
@@ -731,13 +876,13 @@ function App() {
       </section>
 
       <nav className="portal-switcher" aria-label="Portal switcher">
-        {!screen.startsWith('admin') && (
+        {!screen.startsWith('admin') && !isAssessmentScreen && (
           <button
             type="button"
             className="tab-button active"
             onClick={() => setScreen('home')}
           >
-            Candidate portal
+            Candidate Portal
           </button>
         )}
       </nav>
@@ -750,7 +895,7 @@ function App() {
           <article className="welcome-card">
             <div className="landing-header">
               <p className="eyebrow">Assessment flow</p>
-              <h2>Candidate assessment</h2>
+              <h2>Candidate Assessment</h2>
               <p className="landing-lead">
                 A simple screening flow for Tazviro Technologies with one-time email access,
                 monitored aptitude evaluation, and a structured coding round.
@@ -789,16 +934,13 @@ function App() {
 
             <div className="card-actions">
               <button type="button" className="primary-cta" onClick={() => setScreen('register')}>
-                Start candidate registration
-              </button>
-              <button type="button" className="secondary-cta" onClick={() => setScreen('admin-login')}>
-                Open admin portal
+                Start Candidate Registration
               </button>
             </div>
           </article>
 
           <aside className="rule-list">
-            <h2>Rules and regulations</h2>
+            <h2>Rules and Regulations</h2>
             <ul className="bullet-list">
               {assessmentRules.map((rule) => (
                 <li key={rule}>{rule}</li>
@@ -813,7 +955,7 @@ function App() {
           <form className="candidate-form candidate-form-panel" onSubmit={startAssessment}>
             <div className="form-panel-header">
               <p className="eyebrow">Candidate details</p>
-              <h2>Start your assessment</h2>
+              <h2>Start your Assessment</h2>
               <p className="form-support-text">
                 Complete your basic information, upload your resume, and continue to the monitored aptitude round.
               </p>
@@ -892,6 +1034,12 @@ function App() {
             <span>{candidate?.email} | {form.designation}</span>
           </div>
           <div className="monitor-metrics">
+            <span className="timer-chip security-chip">
+              Tab switches: {assessmentSecurity.tabSwitches}
+            </span>
+            <span className="timer-chip security-chip">
+              Fullscreen exits: {assessmentSecurity.fullscreenExits}
+            </span>
             {screen === 'aptitude' && (
               <>
                 <span className={`timer-chip ${aptitudeTimeLeft <= 300 ? 'timer-warning' : ''}`}>
@@ -912,7 +1060,7 @@ function App() {
               <h2>Aptitude round</h2>
               <p>Complete all 40 questions. You have 1 minute per question, for a total of 40 minutes.</p>
             </div>
-            <button type="button" onClick={() => submitAptitude()} disabled={candidateBusy}>
+            <button type="button" onClick={() => submitAptitude()} disabled={candidateBusy || assessmentLocked}>
               {candidateBusy ? 'Submitting...' : 'Submit assessment'}
             </button>
           </div>
@@ -954,6 +1102,7 @@ function App() {
                       type="radio"
                       name={question.id}
                       checked={aptitudeAnswers[question.id] === option}
+                      disabled={assessmentLocked}
                       onChange={() => setAptitudeAnswers((current) => ({ ...current, [question.id]: option }))}
                     />
                     {option}
@@ -972,7 +1121,7 @@ function App() {
               <h2>Coding round</h2>
               <p>Platform-style workspace for real coding answers, explanations, and problem review.</p>
             </div>
-            <button type="button" onClick={submitCoding} disabled={candidateBusy}>
+            <button type="button" onClick={submitCoding} disabled={candidateBusy || assessmentLocked}>
               {candidateBusy ? 'Submitting...' : 'Submit coding round'}
             </button>
           </div>
@@ -990,6 +1139,7 @@ function App() {
                         key={question.id}
                         type="button"
                         className={`coding-tab ${activeCodingQuestionId === question.id ? 'coding-tab-active' : ''}`}
+                        disabled={assessmentLocked}
                         onClick={() => setActiveCodingQuestionId(question.id)}
                       >
                         <span>{index + 1}. {question.title}</span>
@@ -1062,6 +1212,7 @@ function App() {
                               ? 'language-option-active'
                               : ''
                           }`}
+                          disabled={assessmentLocked}
                           onClick={() => changeCodingLanguage(activeCodingQuestion, language)}
                         >
                           {language}
@@ -1074,6 +1225,7 @@ function App() {
                 <textarea
                   className="code-editor"
                   value={codingAnswers[activeCodingQuestion.id]?.code || ''}
+                  disabled={assessmentLocked}
                   onChange={(event) => updateCodingAnswer(activeCodingQuestion.id, 'code', event.target.value)}
                   spellCheck="false"
                   placeholder="Write your code here like a real coding round submission."
@@ -1084,6 +1236,7 @@ function App() {
                   <textarea
                     className="notes-editor"
                     value={codingAnswers[activeCodingQuestion.id]?.notes || ''}
+                    disabled={assessmentLocked}
                     onChange={(event) => updateCodingAnswer(activeCodingQuestion.id, 'notes', event.target.value)}
                     placeholder="Explain your approach, complexity, assumptions, or debugging notes."
                   />
@@ -1096,9 +1249,17 @@ function App() {
 
       {screen === 'failed' && (
         <section className="result-panel">
-          <h2>Assessment result saved</h2>
-          <p>{candidate?.name} scored {aptitudeResult?.score}/40. Minimum required score is 30/40.</p>
-          <p>This candidate did not pass the aptitude round, and the result is now visible in the admin portal.</p>
+          <h2>{assessmentTerminationReason ? 'Assessment ended' : 'Assessment result saved'}</h2>
+          {assessmentTerminationReason ? (
+            <p>{assessmentTerminationReason}</p>
+          ) : (
+            <p>{candidate?.name} scored {aptitudeResult?.score}/40. Minimum required score is 30/40.</p>
+          )}
+          <p>
+            {assessmentTerminationReason
+              ? 'The candidate cannot continue after a tab switch or fullscreen exit.'
+              : 'This candidate did not pass the aptitude round, and the result is now visible in the admin portal.'}
+          </p>
           <button type="button" onClick={() => { resetCandidateFlow(); setScreen('home'); }}>
             Return to welcome screen
           </button>

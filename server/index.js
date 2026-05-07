@@ -680,8 +680,17 @@ app.use((err, _req, res, _next) => {
 
 initDb()
   .then(() => {
-    app.listen(port, () => {
+    const server = app.listen(port, () => {
       console.log(`Hiring API running on http://localhost:${port}`);
+    });
+
+    server.on('error', (error) => {
+      if (error.code === 'EADDRINUSE') {
+        console.error(`Port ${port} is already in use. Stop the existing process or change PORT in .env before starting the API.`);
+      } else {
+        console.error('Failed to start HTTP server:', error);
+      }
+      process.exit(1);
     });
   })
   .catch((error) => {

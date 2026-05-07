@@ -91,11 +91,27 @@ h4 {
 
 .status-panel {
   display: grid;
-  gap: 10px;
+  gap: 12px;
   padding: 28px;
   align-content: center;
   background: linear-gradient(160deg, #163f3a 0%, #2c6a62 100%);
   color: #f6faf9;
+}
+
+.status-panel-logo-wrap {
+  width: min(100%, 250px);
+  padding: 18px;
+  border-radius: 22px;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.98) 0%, rgba(245, 248, 247, 0.96) 100%);
+  box-shadow: 0 16px 34px rgba(8, 23, 21, 0.18);
+}
+
+.status-panel-logo {
+  width: 100%;
+  height: auto;
+  display: block;
+  margin: 0;
+  border-radius: 14px;
 }
 
 .status-panel span,
@@ -489,6 +505,11 @@ textarea {
   color: #aa5424;
 }
 
+.security-chip {
+  background: #f5efe3;
+  color: #7b4d26;
+}
+
 .monitor-strip video {
   width: 220px;
   aspect-ratio: 16 / 9;
@@ -551,6 +572,18 @@ textarea {
   margin: 16px 0 0;
   color: #aa5424;
   font-weight: 700;
+}
+
+.assessment-lock-card {
+  display: grid;
+  gap: 12px;
+  border: 1px solid rgba(166, 90, 46, 0.24);
+  background: linear-gradient(180deg, #fff5eb 0%, #fffaf4 100%);
+}
+
+.assessment-lock-card p {
+  margin: 0;
+  color: #7e4324;
 }
 
 .question-headline {
