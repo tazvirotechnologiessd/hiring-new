@@ -55,7 +55,7 @@ function buildStartEmail(candidate) {
     '- This assessment can be attempted only once per email address.',
     '- The aptitude round contains 40 questions with a 40 minute time limit.',
     '- A minimum score of 30 out of 40 is required to unlock the coding round.',
-    '- Camera and microphone permissions must remain enabled throughout the test.',
+    '- Camera and microphone permissions are optional. If you allow them, keep them enabled throughout the test.',
     '- Do not refresh the page or switch devices during the assessment.',
     '',
     'Please complete the assessment carefully.',
@@ -81,7 +81,7 @@ function buildStartEmail(candidate) {
         <li>This assessment can be attempted only once per email address.</li>
         <li>The aptitude round contains 40 questions with a 40 minute time limit.</li>
         <li>A minimum score of 30 out of 40 is required to unlock the coding round.</li>
-        <li>Camera and microphone permissions must remain enabled throughout the test.</li>
+        <li>Camera and microphone permissions are optional. If you allow them, keep them enabled throughout the test.</li>
         <li>Do not refresh the page or switch devices during the assessment.</li>
       </ul>
       <p>Please complete the assessment carefully.</p>

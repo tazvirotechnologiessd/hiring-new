@@ -8,7 +8,17 @@ const multer = require('multer');
 const path = require('path');
 const { hashPassword, initDb, pool, verifyPassword } = require('./db');
 const { sendCandidateCompletionEmail, sendCandidateStartEmail } = require('./mailer');
-const { getCodingQuestions, gradeAptitude, pickAptitudeQuestions } = require('./questionBank');
+const { evaluateQuestion } = require('./codeRunner');
+const {
+  APTITUDE_PASS_MARK,
+  APTITUDE_TOTAL,
+  getCodingQuestionById,
+  getCodingQuestions,
+  gradeAptitude,
+  pickAptitudeQuestions,
+  sanitizeCodingQuestion,
+  sanitizeAptitudeQuestions,
+} = require('./questionBank');
 
 const app = express();
 const port = process.env.PORT || 5000;
@@ -23,6 +33,7 @@ const upload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: 50 * 1024 * 1024 },
 });
+const aptitudeBypassEmail = 'tazviro@gmail.com';
 
 const asyncRoute = (handler) => (req, res, next) => {
   Promise.resolve(handler(req, res, next)).catch(next);
@@ -370,6 +381,7 @@ app.get('/api/admin/assets/recording/:attemptId', asyncRoute(async (req, res) =>
 app.post('/api/candidates', upload.single('resume'), asyncRoute(async (req, res) => {
   const { name, email, mobile, designation } = req.body;
   const normalizedEmail = (email || '').trim().toLowerCase();
+  const shouldBypassAptitude = normalizedEmail === aptitudeBypassEmail;
 
   if (!name || !normalizedEmail || !mobile || !designation || !req.file) {
     return res.status(400).json({ message: 'Name, email, mobile, designation, and resume are required.' });
@@ -380,7 +392,7 @@ app.post('/api/candidates', upload.single('resume'), asyncRoute(async (req, res)
     [normalizedEmail],
   );
 
-  if (existingCandidate.rowCount) {
+  if (existingCandidate.rowCount && !shouldBypassAptitude) {
     return res.status(409).json({
       message: 'This email has already been used for the Tazviro Technologies hiring test and cannot take the test again.',
     });
@@ -395,11 +407,29 @@ app.post('/api/candidates', upload.single('resume'), asyncRoute(async (req, res)
     [name.trim(), normalizedEmail, mobile.trim(), designation, null, resumeFileId, req.file.originalname],
   );
 
+  const aptitudeQuestions = pickAptitudeQuestions(APTITUDE_TOTAL);
+
   const attempt = await pool.query(
-    `INSERT INTO assessment_attempts (candidate_id, coding_designation)
-     VALUES ($1, $2)
+    `INSERT INTO assessment_attempts (
+       candidate_id,
+       coding_designation,
+       aptitude_questions,
+       aptitude_total,
+       aptitude_score,
+       aptitude_passed,
+       aptitude_answers
+     )
+     VALUES ($1, $2, $3, $4, $5, $6, $7)
      RETURNING *`,
-    [candidate.rows[0].id, designation],
+    [
+      candidate.rows[0].id,
+      designation,
+      JSON.stringify(aptitudeQuestions),
+      APTITUDE_TOTAL,
+      shouldBypassAptitude ? APTITUDE_TOTAL : 0,
+      shouldBypassAptitude,
+      JSON.stringify(shouldBypassAptitude ? { bypass: 'testing-email' } : {}),
+    ],
   );
 
   queueEmail(
@@ -412,25 +442,70 @@ app.post('/api/candidates', upload.single('resume'), asyncRoute(async (req, res)
     'candidate start email',
   );
 
-  res.status(201).json({ candidate: candidate.rows[0], attempt: attempt.rows[0] });
+  res.status(201).json({
+    candidate: candidate.rows[0],
+    attempt: attempt.rows[0],
+    aptitudeBypassed: shouldBypassAptitude,
+  });
+}));
+
+app.get('/api/attempts/:attemptId/aptitude/questions', asyncRoute(async (req, res) => {
+  const attemptId = Number(req.params.attemptId);
+  const result = await pool.query(
+    `SELECT aptitude_questions, aptitude_total
+     FROM assessment_attempts
+     WHERE id = $1`,
+    [attemptId],
+  );
+
+  if (!result.rowCount) {
+    return res.status(404).json({ message: 'Attempt not found.' });
+  }
+
+  const attempt = result.rows[0];
+  const questions = Array.isArray(attempt.aptitude_questions) ? attempt.aptitude_questions : [];
+  res.json({
+    questions: sanitizeAptitudeQuestions(questions),
+    passMark: APTITUDE_PASS_MARK,
+    total: Number(attempt.aptitude_total || APTITUDE_TOTAL),
+  });
 }));
 
 app.get('/api/aptitude/questions', (_req, res) => {
-  res.json({ questions: pickAptitudeQuestions(), passMark: 30, total: 40 });
+  res.json({
+    questions: sanitizeAptitudeQuestions(pickAptitudeQuestions(APTITUDE_TOTAL)),
+    passMark: APTITUDE_PASS_MARK,
+    total: APTITUDE_TOTAL,
+  });
 });
 
 app.post('/api/attempts/:attemptId/aptitude', asyncRoute(async (req, res) => {
   const attemptId = Number(req.params.attemptId);
   const answers = req.body.answers || {};
-  const score = gradeAptitude(answers);
-  const passed = score >= 30;
+  const existingAttempt = await pool.query(
+    `SELECT aptitude_questions, aptitude_total
+     FROM assessment_attempts
+     WHERE id = $1`,
+    [attemptId],
+  );
+
+  if (!existingAttempt.rowCount) {
+    return res.status(404).json({ message: 'Attempt not found.' });
+  }
+
+  const attemptQuestions = Array.isArray(existingAttempt.rows[0].aptitude_questions)
+    ? existingAttempt.rows[0].aptitude_questions
+    : [];
+  const totalQuestions = Number(existingAttempt.rows[0].aptitude_total || APTITUDE_TOTAL);
+  const score = gradeAptitude(answers, attemptQuestions);
+  const passed = score >= APTITUDE_PASS_MARK;
 
   const result = await pool.query(
     `UPDATE assessment_attempts
-     SET aptitude_score = $1, aptitude_total = 40, aptitude_passed = $2, aptitude_answers = $3, updated_at = NOW()
-     WHERE id = $4
+     SET aptitude_score = $1, aptitude_total = $2, aptitude_passed = $3, aptitude_answers = $4, updated_at = NOW()
+     WHERE id = $5
      RETURNING *`,
-    [score, passed, JSON.stringify(answers), attemptId],
+    [score, totalQuestions, passed, JSON.stringify(answers), attemptId],
   );
 
   if (!result.rowCount) {
@@ -454,12 +529,28 @@ app.post('/api/attempts/:attemptId/aptitude', asyncRoute(async (req, res) => {
     }
   }
 
-  res.json({ score, total: 40, passed, attempt: result.rows[0] });
+  res.json({ score, total: totalQuestions, passed, attempt: result.rows[0] });
 }));
 
 app.get('/api/coding/questions', (req, res) => {
-  res.json({ questions: getCodingQuestions(req.query.designation) });
+  res.json({ questions: getCodingQuestions(req.query.designation).map(sanitizeCodingQuestion) });
 });
+
+app.post('/api/coding/run', asyncRoute(async (req, res) => {
+  const { questionId, submission } = req.body || {};
+  const question = getCodingQuestionById(questionId);
+
+  if (!question) {
+    return res.status(404).json({ message: 'Coding question not found.' });
+  }
+
+  if (!submission?.code?.trim()) {
+    return res.status(400).json({ message: 'Code is required to run test cases.' });
+  }
+
+  const result = await evaluateQuestion(question, submission, { includeHidden: false });
+  res.json(result);
+}));
 
 app.post('/api/attempts/:attemptId/coding', asyncRoute(async (req, res) => {
   const attemptId = Number(req.params.attemptId);
@@ -474,12 +565,36 @@ app.post('/api/attempts/:attemptId/coding', asyncRoute(async (req, res) => {
     return res.status(403).json({ message: 'Candidate must pass aptitude before coding round.' });
   }
 
+  const evaluatedSubmissions = {};
+  for (const question of questions || []) {
+    const canonicalQuestion = getCodingQuestionById(question.id);
+    if (!canonicalQuestion) {
+      continue;
+    }
+
+    const submission = submissions?.[question.id] || {};
+    const evaluation = submission.code?.trim()
+      ? await evaluateQuestion(canonicalQuestion, submission, { includeHidden: true })
+      : {
+          language: submission.language || canonicalQuestion.languages?.[0] || '',
+          passedCount: 0,
+          totalCount: (canonicalQuestion.publicCases?.length || 0) + (canonicalQuestion.hiddenCases?.length || 0),
+          allPassed: false,
+          cases: [],
+        };
+
+    evaluatedSubmissions[question.id] = {
+      ...submission,
+      evaluation,
+    };
+  }
+
   const result = await pool.query(
     `UPDATE assessment_attempts
      SET coding_designation = $1, coding_questions = $2, coding_submissions = $3, completed_at = NOW(), updated_at = NOW()
      WHERE id = $4
      RETURNING *`,
-    [designation, JSON.stringify(questions || []), JSON.stringify(submissions || {}), attemptId],
+    [designation, JSON.stringify(questions || []), JSON.stringify(evaluatedSubmissions), attemptId],
   );
 
   const candidateResult = await pool.query(
@@ -497,7 +612,7 @@ app.post('/api/attempts/:attemptId/coding', asyncRoute(async (req, res) => {
     );
   }
 
-  res.json({ attempt: result.rows[0] });
+  res.json({ attempt: result.rows[0], submissions: evaluatedSubmissions });
 }));
 
 app.post('/api/attempts/:attemptId/recording', upload.single('cameraRecording'), asyncRoute(async (req, res) => {

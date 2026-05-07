@@ -61,6 +61,7 @@ async function initDb() {
       aptitude_score INTEGER DEFAULT 0,
       aptitude_total INTEGER DEFAULT 40,
       aptitude_passed BOOLEAN DEFAULT FALSE,
+      aptitude_questions JSONB DEFAULT '[]'::jsonb,
       aptitude_answers JSONB DEFAULT '{}'::jsonb,
       coding_designation TEXT,
       coding_questions JSONB DEFAULT '[]'::jsonb,
@@ -94,6 +95,9 @@ async function initDb() {
 
     ALTER TABLE assessment_attempts
     ADD COLUMN IF NOT EXISTS camera_recording_file_id INTEGER REFERENCES stored_files(id) ON DELETE SET NULL;
+
+    ALTER TABLE assessment_attempts
+    ADD COLUMN IF NOT EXISTS aptitude_questions JSONB DEFAULT '[]'::jsonb;
   `);
 
   const defaultAdminUsername = process.env.ADMIN_USERNAME || 'admin@tazviro.com';

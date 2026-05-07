@@ -3,12 +3,16 @@ import './App.css';
 import logo from './assests/Tazviro Technologies logo design.png';
 
 const APTITUDE_DURATION_SECONDS = 40 * 60;
+const defaultDesignations = ['Backend Developer', 'Frontend Developer', 'Full Stack Developer'];
+const customDesignationValue = '__custom_designation__';
 
 const initialForm = {
   name: '',
   email: '',
   mobile: '',
-  designation: 'Backend Developer',
+  designation: defaultDesignations[0],
+  designationSelection: defaultDesignations[0],
+  customDesignation: '',
   resume: null,
 };
 
@@ -33,7 +37,7 @@ const configuredApiOrigin = (process.env.REACT_APP_API_URL || '').trim().replace
 
 const assessmentRules = [
   'Each candidate can use only one email address and can attempt the assessment only once.',
-  'Camera and microphone permissions must stay enabled from the start of the test until final submission.',
+  'Camera and microphone permissions are optional. If you allow them, keep them enabled until final submission.',
   'The aptitude round contains 40 questions and the total time limit is 40 minutes.',
   'Do not refresh the page, switch devices, or ask another person to answer on your behalf.',
   'Candidates must answer every aptitude question before manual submission.',
@@ -44,10 +48,143 @@ const assessmentRules = [
 
 const codingRules = [
   'Read the full problem statement, constraints, and sample cases before writing code.',
-  'Use the language selector and write complete, interview-style solutions in the editor.',
-  'Explain the approach briefly when the question asks for debugging or design reasoning.',
-  'Write clean code with edge-case handling, because the admin team will review the exact submission.',
+  'Use Run code to verify visible cases before the final submit.',
+  'Submit coding round to evaluate the hidden test cases and save your score.',
+  'Frontend and full stack rounds may include React or HTML/CSS tasks in addition to logic problems.',
 ];
+
+const frontendQuestionModes = new Set(['markup', 'react']);
+const technicalQuestionModes = new Set(['technical']);
+
+function isFrontendQuestion(question) {
+  return frontendQuestionModes.has(question?.mode);
+}
+
+function isTechnicalQuestion(question) {
+  return technicalQuestionModes.has(question?.mode);
+}
+
+function splitMarkupStarter(starterCode = '') {
+  const styleMatch = starterCode.match(/<style[^>]*>([\s\S]*?)<\/style>/i);
+  const css = styleMatch ? styleMatch[1].trim() : '';
+  const html = starterCode.replace(/<style[^>]*>[\s\S]*?<\/style>/i, '').trim();
+
+  return { html, css };
+}
+
+function buildFrontendPanes(question, language) {
+  const starterCode = question.starterCode?.[language] || '';
+
+  if (question.mode === 'react') {
+    return {
+      html: '<div id="root"></div>',
+      css: 'body {\n  margin: 0;\n  font-family: Inter, Arial, sans-serif;\n}\n',
+      react: starterCode,
+    };
+  }
+
+  return {
+    ...splitMarkupStarter(starterCode),
+    react: '',
+  };
+}
+
+function composeFrontendCode(panes = {}) {
+  const html = panes.html || '';
+  const css = panes.css || '';
+  const react = panes.react || '';
+
+  return [
+    css.trim() ? `<style>\n${css}\n</style>` : '',
+    html.trim(),
+    react.trim() ? `\n/* React */\n${react}` : '',
+  ].filter(Boolean).join('\n\n');
+}
+
+function escapeClosingScript(value = '') {
+  return String(value).replace(/<\/script/gi, '<\\/script');
+}
+
+function stripReactModuleSyntax(value = '') {
+  return String(value)
+    .replace(/^\s*import\s+.*?;\s*$/gm, '')
+    .replace(/export\s+default\s+function\s+([A-Za-z0-9_$]+)/, 'function $1')
+    .replace(/export\s+default\s+([A-Za-z0-9_$]+);?/, 'const __DefaultComponent = $1;')
+    .trim();
+}
+
+function getReactComponentName(value = '') {
+  const defaultFunction = String(value).match(/export\s+default\s+function\s+([A-Za-z0-9_$]+)/);
+  if (defaultFunction) {
+    return defaultFunction[1];
+  }
+
+  const namedFunction = String(value).match(/function\s+([A-Z][A-Za-z0-9_$]*)\s*\(/);
+  if (namedFunction) {
+    return namedFunction[1];
+  }
+
+  const namedConstant = String(value).match(/const\s+([A-Z][A-Za-z0-9_$]*)\s*=/);
+  return namedConstant ? namedConstant[1] : '';
+}
+
+function buildPreviewDocument(question, answer = {}) {
+  const panes = answer.panes || {};
+  const html = panes.html || '';
+  const css = panes.css || '';
+  const react = panes.react || '';
+
+  if (question?.mode === 'react') {
+    const sanitizedReact = escapeClosingScript(stripReactModuleSyntax(react));
+    const componentName = getReactComponentName(react);
+    const componentResolver = componentName
+      ? `typeof ${componentName} !== 'undefined' ? ${componentName} : null`
+      : 'null';
+    return `<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <style>
+      ${css}
+    </style>
+  </head>
+  <body>
+    ${html || '<div id="root"></div>'}
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    <script type="text/babel">
+      const useState = React.useState;
+      ${sanitizedReact}
+      const rootNode = document.getElementById('root') || document.body.appendChild(document.createElement('div'));
+      const Component = typeof __DefaultComponent !== 'undefined'
+        ? __DefaultComponent
+        : ${componentResolver};
+      if (Component) {
+        ReactDOM.createRoot(rootNode).render(<Component />);
+      } else {
+        rootNode.innerHTML = '<section style="padding:24px;font-family:Arial,sans-serif;color:#334">Add a default React component to preview it here.</section>';
+      }
+    </script>
+  </body>
+</html>`;
+  }
+
+  return `<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <style>
+      ${css}
+    </style>
+  </head>
+  <body>
+    ${html}
+  </body>
+</html>`;
+}
 
 function EyeIcon({ open }) {
   return (
@@ -91,10 +228,14 @@ function formatTime(totalSeconds) {
 function buildCodingDrafts(questions) {
   return questions.reduce((accumulator, question) => {
     const firstLanguage = question.languages?.[0] || 'Plain text';
+    const panes = isFrontendQuestion(question) ? buildFrontendPanes(question, firstLanguage) : null;
     accumulator[question.id] = {
       language: firstLanguage,
-      code: question.starterCode?.[firstLanguage] || '',
+      code: panes ? composeFrontendCode(panes) : question.starterCode?.[firstLanguage] || '',
+      panes,
       notes: '',
+      lastRun: null,
+      finalEvaluation: null,
     };
     return accumulator;
   }, {});
@@ -176,6 +317,7 @@ function App() {
   const [codingQuestions, setCodingQuestions] = useState([]);
   const [codingAnswers, setCodingAnswers] = useState({});
   const [activeCodingQuestionId, setActiveCodingQuestionId] = useState('');
+  const [codingSummary, setCodingSummary] = useState(null);
   const [candidateMessage, setCandidateMessage] = useState('');
   const [candidateBusy, setCandidateBusy] = useState(false);
   const [stream, setStream] = useState(null);
@@ -214,7 +356,10 @@ function App() {
 
   const isAssessmentScreen = screen === 'aptitude' || screen === 'coding';
   const answeredCount = Object.keys(aptitudeAnswers).length;
-  const canStart = form.name && form.email && form.mobile && form.designation && form.resume;
+  const activeDesignation = form.designationSelection === customDesignationValue
+    ? form.customDesignation.trim()
+    : form.designation;
+  const canStart = form.name && form.email && form.mobile && activeDesignation && form.resume;
   const unansweredQuestions = useMemo(
     () =>
       aptitudeQuestions
@@ -293,6 +438,25 @@ function App() {
 
   const updateField = (event) => {
     const { name, value, files } = event.target;
+
+    if (name === 'designationSelection') {
+      setForm((current) => ({
+        ...current,
+        designationSelection: value,
+        designation: value === customDesignationValue ? current.customDesignation.trim() : value,
+      }));
+      return;
+    }
+
+    if (name === 'customDesignation') {
+      setForm((current) => ({
+        ...current,
+        customDesignation: value,
+        designation: value.trim(),
+      }));
+      return;
+    }
+
     setForm((current) => ({
       ...current,
       [name]: files ? files[0] : value,
@@ -338,6 +502,7 @@ function App() {
     setCodingQuestions([]);
     setCodingAnswers({});
     setActiveCodingQuestionId('');
+    setCodingSummary(null);
     setCandidateMessage('');
     setRecordingSaved(false);
     setAssessmentTerminationReason('');
@@ -412,18 +577,37 @@ function App() {
   }, [screen, adminSession, loadAdminData]);
 
   const startCamera = async () => {
-    const mediaStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
-    setStream(mediaStream);
+    if (!navigator.mediaDevices?.getUserMedia) {
+      return {
+        enabled: false,
+        warning: 'Camera and microphone access is optional. You can continue with the test without granting those permissions.',
+      };
+    }
 
-    chunksRef.current = [];
-    const recorder = new MediaRecorder(mediaStream, { mimeType: 'video/webm' });
-    recorder.ondataavailable = (event) => {
-      if (event.data.size > 0) {
-        chunksRef.current.push(event.data);
+    try {
+      const mediaStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+      setStream(mediaStream);
+      chunksRef.current = [];
+
+      if (typeof MediaRecorder === 'function') {
+        const recorder = new MediaRecorder(mediaStream, { mimeType: 'video/webm' });
+        recorder.ondataavailable = (event) => {
+          if (event.data.size > 0) {
+            chunksRef.current.push(event.data);
+          }
+        };
+        recorder.start(1000);
+        recorderRef.current = recorder;
       }
-    };
-    recorder.start(1000);
-    recorderRef.current = recorder;
+
+      return { enabled: true, warning: '' };
+    } catch (_error) {
+      cleanupCamera();
+      return {
+        enabled: false,
+        warning: 'Camera and microphone access is optional. You can continue with the test without granting those permissions.',
+      };
+    }
   };
 
   const stopCameraAndUpload = useCallback(async (attemptId) => {
@@ -576,13 +760,13 @@ function App() {
       }
 
       await enterFullscreenMode();
-      await startCamera();
+      const cameraResult = await startCamera();
 
       const data = new FormData();
       data.append('name', form.name);
       data.append('email', form.email);
       data.append('mobile', form.mobile);
-      data.append('designation', form.designation);
+      data.append('designation', activeDesignation);
       data.append('resume', form.resume);
 
       const registerResponse = await fetch(buildApiUrl('/api/candidates'), {
@@ -598,15 +782,30 @@ function App() {
       setCandidate(registered.candidate);
       setAttempt(registered.attempt);
       setAptitudeTimeLeft(APTITUDE_DURATION_SECONDS);
+      setCandidateMessage(
+        registered.aptitudeBypassed
+          ? cameraResult.warning || 'Testing email detected. Aptitude round passed automatically.'
+          : cameraResult.warning || '',
+      );
 
-      const questionResponse = await fetch(buildApiUrl('/api/aptitude/questions'));
+      if (registered.aptitudeBypassed || registered.attempt?.aptitude_passed) {
+        await proceedAfterAptitude({
+          score: registered.attempt?.aptitude_score ?? 40,
+          total: registered.attempt?.aptitude_total ?? 40,
+          passed: true,
+          attempt: registered.attempt,
+        });
+        return;
+      }
+
+      const questionResponse = await fetch(buildApiUrl(`/api/attempts/${registered.attempt.id}/aptitude/questions`));
       const questionData = await readResponsePayload(questionResponse);
       setAptitudeQuestions(questionData.questions || []);
       setScreen('aptitude');
     } catch (error) {
       await exitFullscreenMode().catch(() => {});
       cleanupCamera();
-      setCandidateMessage(error.message || 'Please allow fullscreen, camera, and microphone access to continue.');
+      setCandidateMessage(error.message || 'Please allow fullscreen access to continue.');
     } finally {
       setCandidateBusy(false);
     }
@@ -621,14 +820,14 @@ function App() {
       return;
     }
 
-    const codingResponse = await fetch(buildApiUrl(`/api/coding/questions?designation=${encodeURIComponent(form.designation)}`));
+    const codingResponse = await fetch(buildApiUrl(`/api/coding/questions?designation=${encodeURIComponent(activeDesignation)}`));
     const codingData = await readResponsePayload(codingResponse);
     const questions = codingData.questions || [];
     setCodingQuestions(questions);
     setCodingAnswers(buildCodingDrafts(questions));
     setActiveCodingQuestionId(questions[0]?.id || '');
     setScreen('coding');
-  }, [attempt?.id, form.designation, stopCameraAndUpload]);
+  }, [activeDesignation, attempt?.id, stopCameraAndUpload]);
 
   const submitAptitude = useCallback(async ({ autoSubmit = false } = {}) => {
     if (!attempt) {
@@ -678,8 +877,30 @@ function App() {
       [questionId]: {
         ...current[questionId],
         [field]: value,
+        ...(field === 'code' ? { lastRun: null, finalEvaluation: null } : {}),
       },
     }));
+  };
+
+  const updateFrontendPane = (questionId, pane, value) => {
+    setCodingAnswers((current) => {
+      const currentAnswer = current[questionId] || {};
+      const panes = {
+        ...(currentAnswer.panes || {}),
+        [pane]: value,
+      };
+
+      return {
+        ...current,
+        [questionId]: {
+          ...currentAnswer,
+          panes,
+          code: composeFrontendCode(panes),
+          lastRun: null,
+          finalEvaluation: null,
+        },
+      };
+    });
   };
 
   const changeCodingLanguage = (question, language) => {
@@ -688,12 +909,115 @@ function App() {
       [question.id]: {
         ...current[question.id],
         language,
-        code:
-          current[question.id]?.language === language && current[question.id]?.code
-            ? current[question.id].code
-            : question.starterCode?.[language] || current[question.id]?.code || '',
+        ...(
+          isFrontendQuestion(question)
+            ? (() => {
+                const panes = current[question.id]?.language === language && current[question.id]?.panes
+                  ? current[question.id].panes
+                  : buildFrontendPanes(question, language);
+                return {
+                  panes,
+                  code: composeFrontendCode(panes),
+                };
+              })()
+            : {
+                code:
+                  current[question.id]?.language === language && current[question.id]?.code
+                    ? current[question.id].code
+                    : question.starterCode?.[language] || current[question.id]?.code || '',
+              }
+        ),
+        lastRun: null,
+        finalEvaluation: null,
       },
     }));
+  };
+
+  const runCodingCode = async () => {
+    if (!activeCodingQuestion) {
+      return;
+    }
+
+    const submission = codingAnswers[activeCodingQuestion.id];
+    if (!submission?.code?.trim()) {
+      setCandidateMessage('Please write some code before running test cases.');
+      return;
+    }
+
+    if (isTechnicalQuestion(activeCodingQuestion)) {
+      setCandidateBusy(true);
+      setCandidateMessage('');
+
+      try {
+        const response = await fetch(buildApiUrl('/api/coding/run'), {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            questionId: activeCodingQuestion.id,
+            submission: {
+              language: submission.language,
+              code: submission.code,
+              notes: submission.notes,
+            },
+          }),
+        });
+
+        const result = await readResponsePayload(response);
+        if (!response.ok) {
+          throw new Error(result.message || 'Unable to check answer.');
+        }
+
+        setCodingAnswers((current) => ({
+          ...current,
+          [activeCodingQuestion.id]: {
+            ...current[activeCodingQuestion.id],
+            lastRun: result,
+          },
+        }));
+        setCandidateMessage('Answer check complete. Your response will still be reviewed by the admin team.');
+      } catch (error) {
+        setCandidateMessage(error.message || 'Answer check failed.');
+      } finally {
+        setCandidateBusy(false);
+      }
+      return;
+    }
+
+    setCandidateBusy(true);
+    setCandidateMessage('');
+
+    try {
+      const response = await fetch(buildApiUrl('/api/coding/run'), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          questionId: activeCodingQuestion.id,
+          submission: {
+            language: submission.language,
+            code: submission.code,
+            notes: submission.notes,
+          },
+        }),
+      });
+
+      const result = await readResponsePayload(response);
+      if (!response.ok) {
+        throw new Error(result.message || 'Unable to run test cases.');
+      }
+
+      setCodingAnswers((current) => ({
+        ...current,
+        [activeCodingQuestion.id]: {
+          ...current[activeCodingQuestion.id],
+          lastRun: result,
+        },
+      }));
+      setCandidateMessage(`Run complete: ${result.passedCount}/${result.totalCount} visible test cases passed.`);
+    } catch (error) {
+      setCandidateMessage(error.message || 'Running code failed.');
+    } finally {
+      setCandidateBusy(false);
+    }
   };
 
   const submitCoding = async () => {
@@ -719,7 +1043,7 @@ function App() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          designation: form.designation,
+          designation: activeDesignation,
           questions: codingQuestions,
           submissions: codingAnswers,
         }),
@@ -730,10 +1054,22 @@ function App() {
         throw new Error(result.message || 'Unable to submit coding round.');
       }
 
+      setCodingAnswers((current) => {
+        const next = { ...current };
+        Object.entries(result.submissions || {}).forEach(([questionId, submission]) => {
+          next[questionId] = {
+            ...next[questionId],
+            ...submission,
+            finalEvaluation: submission.evaluation || null,
+          };
+        });
+        return next;
+      });
+      setCodingSummary(result.submissions || {});
       await stopCameraAndUpload(attempt.id);
       setScreen('complete');
     } catch (error) {
-      setCandidateMessage(error.message || 'Coding round submission failed.');
+      setCandidateMessage(error.message || `${isTechnicalRound ? 'Technical' : 'Coding'} round submission failed.`);
     } finally {
       setCandidateBusy(false);
     }
@@ -842,6 +1178,13 @@ function App() {
     }
     return 'Registration pending';
   })();
+  const activeCodingAnswer = activeCodingQuestion ? codingAnswers[activeCodingQuestion.id] : null;
+  const activeQuestionUsesFrontendEditor = isFrontendQuestion(activeCodingQuestion);
+  const activeQuestionUsesTechnicalEditor = isTechnicalQuestion(activeCodingQuestion);
+  const isTechnicalRound = codingQuestions.length > 0 && codingQuestions.every(isTechnicalQuestion);
+  const activePreviewDocument = activeQuestionUsesFrontendEditor
+    ? buildPreviewDocument(activeCodingQuestion, activeCodingAnswer)
+    : '';
 
   return (
     <main className="app-shell">
@@ -909,7 +1252,7 @@ function App() {
               </article>
               <article className="overview-item">
                 <strong>Live monitoring</strong>
-                <p>Camera and microphone access stay enabled during the assessment.</p>
+                <p>Camera and microphone access is optional for candidates taking the assessment.</p>
               </article>
               <article className="overview-item">
                 <strong>Round-based selection</strong>
@@ -957,7 +1300,7 @@ function App() {
               <p className="eyebrow">Candidate details</p>
               <h2>Start your Assessment</h2>
               <p className="form-support-text">
-                Complete your basic information, upload your resume, and continue to the monitored aptitude round.
+                Complete your basic information, upload your resume, and continue to the aptitude round.
               </p>
             </div>
 
@@ -998,12 +1341,26 @@ function App() {
             </label>
             <label>
               Designation
-              <select name="designation" value={form.designation} onChange={updateField}>
-                <option>Backend Developer</option>
-                <option>Frontend Developer</option>
-                <option>Full Stack Developer</option>
+              <select name="designationSelection" value={form.designationSelection} onChange={updateField}>
+                {defaultDesignations.map((designation) => (
+                  <option key={designation} value={designation}>{designation}</option>
+                ))}
+                <option value={customDesignationValue}>Other</option>
               </select>
             </label>
+            {form.designationSelection === customDesignationValue && (
+              <label>
+                Enter your role
+                <input
+                  name="customDesignation"
+                  value={form.customDesignation}
+                  onChange={updateField}
+                  placeholder="Type your role"
+                  autoComplete="organization-title"
+                  required
+                />
+              </label>
+            )}
             <label className="file-input resume-upload-field">
               <span>Resume upload</span>
               <div className="upload-shell">
@@ -1031,7 +1388,7 @@ function App() {
         <section className="monitor-strip">
           <div>
             <strong>{candidate?.name}</strong>
-            <span>{candidate?.email} | {form.designation}</span>
+            <span>{candidate?.email} | {activeDesignation}</span>
           </div>
           <div className="monitor-metrics">
             <span className="timer-chip security-chip">
@@ -1048,7 +1405,7 @@ function App() {
                 <span className="timer-chip">Answered: {answeredCount}/40</span>
               </>
             )}
-            <video ref={videoRef} autoPlay muted playsInline aria-label="Live camera preview" />
+            {stream && <video ref={videoRef} autoPlay muted playsInline aria-label="Live camera preview" />}
           </div>
         </section>
       )}
@@ -1060,9 +1417,6 @@ function App() {
               <h2>Aptitude round</h2>
               <p>Complete all 40 questions. You have 1 minute per question, for a total of 40 minutes.</p>
             </div>
-            <button type="button" onClick={() => submitAptitude()} disabled={candidateBusy || assessmentLocked}>
-              {candidateBusy ? 'Submitting...' : 'Submit assessment'}
-            </button>
           </div>
 
           <article className="question-card summary-card">
@@ -1111,6 +1465,16 @@ function App() {
               </div>
             </article>
           ))}
+
+          <div className="section-heading">
+            <div>
+              <h2>Ready to submit?</h2>
+              <p>Review the unanswered count above, then submit your aptitude round from here.</p>
+            </div>
+            <button type="button" onClick={() => submitAptitude()} disabled={candidateBusy || assessmentLocked}>
+              {candidateBusy ? 'Submitting...' : 'Submit assessment'}
+            </button>
+          </div>
         </section>
       )}
 
@@ -1118,22 +1482,31 @@ function App() {
         <section className="coding-shell">
           <div className="section-heading">
             <div>
-              <h2>Coding round</h2>
-              <p>Platform-style workspace for real coding answers, explanations, and problem review.</p>
+              <h2>{isTechnicalRound ? 'Technical round' : 'Coding round'}</h2>
+              <p>
+                {isTechnicalRound
+                  ? 'Role-specific technical questions based on the designation entered during registration.'
+                  : 'Platform-style workspace for real coding answers, explanations, and problem review.'}
+              </p>
             </div>
             <button type="button" onClick={submitCoding} disabled={candidateBusy || assessmentLocked}>
-              {candidateBusy ? 'Submitting...' : 'Submit coding round'}
+              {candidateBusy ? 'Submitting...' : `Submit ${isTechnicalRound ? 'technical' : 'coding'} round`}
             </button>
           </div>
 
           <div className="coding-layout">
             <aside className="coding-sidebar">
               <div className="question-card">
-                <h3>Problems</h3>
+                <h3>{isTechnicalRound ? 'Questions' : 'Problems'}</h3>
                 <div className="coding-tabs">
                   {codingQuestions.map((question, index) => {
                     const answer = codingAnswers[question.id];
-                    const isDone = Boolean(answer?.code?.trim());
+                    const evaluation = answer?.finalEvaluation || answer?.lastRun;
+                    const statusText = evaluation
+                      ? `${evaluation.passedCount}/${evaluation.totalCount} passed`
+                      : Boolean(answer?.code?.trim())
+                        ? 'Draft saved'
+                        : 'Pending';
                     return (
                       <button
                         key={question.id}
@@ -1143,7 +1516,7 @@ function App() {
                         onClick={() => setActiveCodingQuestionId(question.id)}
                       >
                         <span>{index + 1}. {question.title}</span>
-                        <small>{isDone ? 'Completed' : 'Pending'}</small>
+                        <small>{statusText}</small>
                       </button>
                     );
                   })}
@@ -1164,12 +1537,13 @@ function App() {
               <article className="question-card coding-problem">
                 <div className="problem-header">
                   <div>
-                    <p className="eyebrow">Coding problem</p>
+                    <p className="eyebrow">{activeQuestionUsesTechnicalEditor ? 'Technical question' : 'Coding problem'}</p>
                     <h3>{activeCodingQuestion.title}</h3>
                   </div>
                   <div className="problem-meta">
                     <span>{activeCodingQuestion.difficulty}</span>
                     <span>{activeCodingQuestion.estimatedTime}</span>
+                    <span>{activeCodingQuestion.category}</span>
                   </div>
                 </div>
                 <p>{activeCodingQuestion.prompt}</p>
@@ -1183,11 +1557,11 @@ function App() {
                   </ul>
                 </div>
                 <div className="sample-grid">
-                  {(activeCodingQuestion.sampleCases || []).map((sample) => (
-                    <div className="sample-card" key={sample.input}>
+                  {(activeCodingQuestion.publicCases || []).map((sample) => (
+                    <div className="sample-card" key={sample.label}>
                       <strong>{sample.label}</strong>
-                      <pre>Input: {sample.input}</pre>
-                      <pre>Output: {sample.output}</pre>
+                      <pre>Input: {typeof sample.input === 'string' ? sample.input : JSON.stringify(sample.input, null, 2)}</pre>
+                      <pre>Expected: {typeof sample.output === 'string' ? sample.output : JSON.stringify(sample.output, null, 2)}</pre>
                       <p>{sample.explanation}</p>
                     </div>
                   ))}
@@ -1198,7 +1572,11 @@ function App() {
                 <div className="editor-toolbar">
                   <div className="editor-title-block">
                     <strong>Editor</strong>
-                    <span>Write your final solution in the selected language.</span>
+                    <span>
+                      {activeQuestionUsesTechnicalEditor
+                        ? 'Write a clear technical answer, check it, then submit for admin review.'
+                        : 'Write code, run visible cases, then submit for final evaluation.'}
+                    </span>
                   </div>
                   <div className="language-picker">
                     <span className="language-label">Language</span>
@@ -1222,25 +1600,127 @@ function App() {
                   </div>
                 </div>
 
-                <textarea
-                  className="code-editor"
-                  value={codingAnswers[activeCodingQuestion.id]?.code || ''}
-                  disabled={assessmentLocked}
-                  onChange={(event) => updateCodingAnswer(activeCodingQuestion.id, 'code', event.target.value)}
-                  spellCheck="false"
-                  placeholder="Write your code here like a real coding round submission."
-                />
+                <div className="editor-actions">
+                  <button type="button" className="ghost-button" onClick={runCodingCode} disabled={candidateBusy || assessmentLocked}>
+                    {candidateBusy ? 'Checking...' : activeQuestionUsesTechnicalEditor ? 'Check answer' : 'Run code'}
+                  </button>
+                  <button type="button" onClick={submitCoding} disabled={candidateBusy || assessmentLocked}>
+                    {candidateBusy ? 'Submitting...' : `Submit ${isTechnicalRound ? 'technical' : 'coding'} round`}
+                  </button>
+                </div>
 
-                <label>
-                  Explanation or notes
+                {activeQuestionUsesFrontendEditor ? (
+                  <div className="frontend-workbench">
+                    <div className="frontend-panes" aria-label="Frontend editor panes">
+                      <label className="frontend-pane">
+                        <span>HTML</span>
+                        <textarea
+                          className="code-editor pane-editor"
+                          value={activeCodingAnswer?.panes?.html || ''}
+                          disabled={assessmentLocked}
+                          onChange={(event) => updateFrontendPane(activeCodingQuestion.id, 'html', event.target.value)}
+                          spellCheck="false"
+                          placeholder="<section>...</section>"
+                        />
+                      </label>
+
+                      <label className="frontend-pane">
+                        <span>CSS</span>
+                        <textarea
+                          className="code-editor pane-editor"
+                          value={activeCodingAnswer?.panes?.css || ''}
+                          disabled={assessmentLocked}
+                          onChange={(event) => updateFrontendPane(activeCodingQuestion.id, 'css', event.target.value)}
+                          spellCheck="false"
+                          placeholder=".profile-card { ... }"
+                        />
+                      </label>
+
+                      <label className="frontend-pane">
+                        <span>React</span>
+                        <textarea
+                          className="code-editor pane-editor"
+                          value={activeCodingAnswer?.panes?.react || ''}
+                          disabled={assessmentLocked}
+                          onChange={(event) => updateFrontendPane(activeCodingQuestion.id, 'react', event.target.value)}
+                          spellCheck="false"
+                          placeholder="export default function App() { ... }"
+                        />
+                      </label>
+                    </div>
+
+                    <div className="preview-panel">
+                      <div className="preview-header">
+                        <strong>Live preview</strong>
+                        <span>{activeCodingQuestion.mode === 'react' ? 'React' : 'HTML/CSS'}</span>
+                      </div>
+                      <iframe
+                        title={`${activeCodingQuestion.title} live preview`}
+                        sandbox="allow-scripts"
+                        srcDoc={activePreviewDocument}
+                      />
+                    </div>
+                  </div>
+                ) : activeQuestionUsesTechnicalEditor ? (
                   <textarea
-                    className="notes-editor"
-                    value={codingAnswers[activeCodingQuestion.id]?.notes || ''}
+                    className="code-editor answer-editor"
+                    value={codingAnswers[activeCodingQuestion.id]?.code || ''}
                     disabled={assessmentLocked}
-                    onChange={(event) => updateCodingAnswer(activeCodingQuestion.id, 'notes', event.target.value)}
-                    placeholder="Explain your approach, complexity, assumptions, or debugging notes."
+                    onChange={(event) => updateCodingAnswer(activeCodingQuestion.id, 'code', event.target.value)}
+                    spellCheck="true"
+                    placeholder="Write your role-specific technical answer here."
                   />
-                </label>
+                ) : (
+                  <textarea
+                    className="code-editor"
+                    value={codingAnswers[activeCodingQuestion.id]?.code || ''}
+                    disabled={assessmentLocked}
+                    onChange={(event) => updateCodingAnswer(activeCodingQuestion.id, 'code', event.target.value)}
+                    spellCheck="false"
+                    placeholder="Write your code here like a real coding round submission."
+                  />
+                )}
+
+                {!activeQuestionUsesTechnicalEditor && (
+                  <label>
+                    Explanation or notes
+                    <textarea
+                      className="notes-editor"
+                      value={codingAnswers[activeCodingQuestion.id]?.notes || ''}
+                      disabled={assessmentLocked}
+                      onChange={(event) => updateCodingAnswer(activeCodingQuestion.id, 'notes', event.target.value)}
+                      placeholder="Explain your approach, complexity, assumptions, or debugging notes."
+                    />
+                  </label>
+                )}
+
+                {(codingAnswers[activeCodingQuestion.id]?.lastRun || codingAnswers[activeCodingQuestion.id]?.finalEvaluation) && (
+                  <div className="test-results-panel">
+                    <div className="test-results-header">
+                      <strong>Test results</strong>
+                      <span>
+                        {(codingAnswers[activeCodingQuestion.id]?.finalEvaluation || codingAnswers[activeCodingQuestion.id]?.lastRun).passedCount}
+                        /
+                        {(codingAnswers[activeCodingQuestion.id]?.finalEvaluation || codingAnswers[activeCodingQuestion.id]?.lastRun).totalCount}
+                        {' '}passed
+                      </span>
+                    </div>
+                    <div className="test-case-list">
+                      {((codingAnswers[activeCodingQuestion.id]?.finalEvaluation || codingAnswers[activeCodingQuestion.id]?.lastRun).cases || []).map((item) => (
+                        <article className={`test-case-card ${item.passed ? 'test-pass' : 'test-fail'}`} key={`${item.label}-${item.input ? JSON.stringify(item.input) : item.label}`}>
+                          <div className="test-case-top">
+                            <strong>{item.label}</strong>
+                            <span>{item.passed ? 'Passed' : 'Failed'}</span>
+                          </div>
+                          <pre>Input: {typeof item.input === 'string' ? item.input : JSON.stringify(item.input, null, 2)}</pre>
+                          <pre>Expected: {typeof item.expected === 'string' ? item.expected : JSON.stringify(item.expected, null, 2)}</pre>
+                          {item.actual !== undefined && <pre>Actual: {typeof item.actual === 'string' ? item.actual : JSON.stringify(item.actual, null, 2)}</pre>}
+                          {item.error && <p className="warning-text">{item.error}</p>}
+                        </article>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </article>
             </div>
           </div>
@@ -1269,8 +1749,21 @@ function App() {
       {screen === 'complete' && (
         <section className="result-panel">
           <h2>Assessment submitted successfully</h2>
-          <p>{candidate?.name} passed aptitude with {aptitudeResult?.score}/40 and completed the coding round.</p>
-          <p>Candidate details, resume, recording, and coding answers are now available in the admin portal.</p>
+          <p>{candidate?.name} passed aptitude with {aptitudeResult?.score}/40 and completed the {isTechnicalRound ? 'technical' : 'coding'} round.</p>
+          {codingSummary && (
+            <div className="submission-list">
+              {codingQuestions.map((question) => {
+                const evaluation = codingSummary[question.id]?.evaluation;
+                return (
+                  <div className="submission-card" key={question.id}>
+                    <strong>{question.title}</strong>
+                    <p>{evaluation ? `${evaluation.passedCount}/${evaluation.totalCount} test cases passed.` : 'No evaluation available.'}</p>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+          <p>Candidate details, resume, recording, and {isTechnicalRound ? 'technical' : 'coding'} answers are now available in the admin portal.</p>
           <button type="button" onClick={() => { resetCandidateFlow(); setScreen('home'); }}>
             Return to welcome screen
           </button>

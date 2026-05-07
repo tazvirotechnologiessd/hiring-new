@@ -1,268 +1,577 @@
-const aptitudeQuestions = [
-  { id: 'apt-1', question: 'If 12 workers finish a job in 15 days, how many days will 20 workers take?', options: ['6', '9', '12', '25'], answer: '9' },
-  { id: 'apt-2', question: 'A number increased by 20% becomes 180. What is the original number?', options: ['120', '140', '150', '160'], answer: '150' },
-  { id: 'apt-3', question: 'Find the next number: 3, 9, 27, 81, ?', options: ['108', '162', '216', '243'], answer: '243' },
-  { id: 'apt-4', question: 'The average of 5 numbers is 18. If one number is removed, the average becomes 16. What number was removed?', options: ['20', '24', '26', '28'], answer: '26' },
-  { id: 'apt-5', question: 'A train 120 m long crosses a pole in 6 seconds. What is its speed?', options: ['60 km/h', '72 km/h', '80 km/h', '90 km/h'], answer: '72 km/h' },
-  { id: 'apt-6', question: 'What is 35% of 240?', options: ['72', '78', '84', '90'], answer: '84' },
-  { id: 'apt-7', question: 'Simple interest on Rs. 5000 at 8% for 2 years is:', options: ['Rs. 400', 'Rs. 600', 'Rs. 800', 'Rs. 1000'], answer: 'Rs. 800' },
-  { id: 'apt-8', question: 'If A:B = 2:3 and B:C = 4:5, then A:C is:', options: ['6:15', '8:15', '2:5', '3:5'], answer: '8:15' },
-  { id: 'apt-9', question: 'A shopkeeper marks an item Rs. 800 and gives 10% discount. Selling price is:', options: ['Rs. 680', 'Rs. 700', 'Rs. 720', 'Rs. 760'], answer: 'Rs. 720' },
-  { id: 'apt-10', question: 'Find the odd one: Apple, Mango, Carrot, Banana', options: ['Apple', 'Mango', 'Carrot', 'Banana'], answer: 'Carrot' },
-  { id: 'apt-11', question: 'If 7x = 84, then x is:', options: ['7', '10', '12', '14'], answer: '12' },
-  { id: 'apt-12', question: 'A can do a work in 10 days and B in 15 days. Together they take:', options: ['5 days', '6 days', '8 days', '12 days'], answer: '6 days' },
-  { id: 'apt-13', question: 'Find the next letters: AB, DE, GH, ?', options: ['IJ', 'JK', 'KL', 'LM'], answer: 'JK' },
-  { id: 'apt-14', question: 'The perimeter of a square is 48 cm. Its area is:', options: ['96 sq cm', '120 sq cm', '144 sq cm', '196 sq cm'], answer: '144 sq cm' },
-  { id: 'apt-15', question: 'Which is the smallest fraction?', options: ['1/2', '2/3', '3/4', '4/5'], answer: '1/2' },
-  { id: 'apt-16', question: 'A clock shows 3:15. The angle between the hands is closest to:', options: ['0 degrees', '7.5 degrees', '15 degrees', '30 degrees'], answer: '7.5 degrees' },
-  { id: 'apt-17', question: 'If CODING is written as DPEJOH, then TEST is written as:', options: ['UFTU', 'SDRS', 'VGUW', 'UERT'], answer: 'UFTU' },
-  { id: 'apt-18', question: 'A man sells an article for Rs. 550 at 10% profit. Cost price is:', options: ['Rs. 450', 'Rs. 500', 'Rs. 525', 'Rs. 600'], answer: 'Rs. 500' },
-  { id: 'apt-19', question: 'The LCM of 12 and 18 is:', options: ['24', '30', '36', '72'], answer: '36' },
-  { id: 'apt-20', question: 'The HCF of 48 and 60 is:', options: ['6', '8', '12', '16'], answer: '12' },
-  { id: 'apt-21', question: 'If 15% of a number is 45, the number is:', options: ['200', '250', '300', '350'], answer: '300' },
-  { id: 'apt-22', question: 'Find the missing number: 2, 6, 12, 20, 30, ?', options: ['36', '40', '42', '44'], answer: '42' },
-  { id: 'apt-23', question: 'A bag has 3 red and 2 blue balls. Probability of picking a red ball is:', options: ['2/5', '3/5', '1/2', '3/2'], answer: '3/5' },
-  { id: 'apt-24', question: 'What is the square root of 196?', options: ['12', '13', '14', '16'], answer: '14' },
-  { id: 'apt-25', question: 'If today is Monday, what day will it be after 17 days?', options: ['Wednesday', 'Thursday', 'Friday', 'Saturday'], answer: 'Thursday' },
-  { id: 'apt-26', question: 'A rectangle has length 20 and breadth 12. Its area is:', options: ['64', '120', '240', '320'], answer: '240' },
-  { id: 'apt-27', question: 'Choose the synonym of "Rapid".', options: ['Slow', 'Fast', 'Weak', 'Late'], answer: 'Fast' },
-  { id: 'apt-28', question: 'Choose the antonym of "Expand".', options: ['Grow', 'Stretch', 'Contract', 'Increase'], answer: 'Contract' },
-  { id: 'apt-29', question: 'If 5 pens cost Rs. 75, then 8 pens cost:', options: ['Rs. 100', 'Rs. 110', 'Rs. 120', 'Rs. 130'], answer: 'Rs. 120' },
-  { id: 'apt-30', question: 'A person travels 60 km in 1.5 hours. Speed is:', options: ['30 km/h', '35 km/h', '40 km/h', '45 km/h'], answer: '40 km/h' },
-  { id: 'apt-31', question: 'Which number is divisible by both 3 and 5?', options: ['25', '30', '32', '42'], answer: '30' },
-  { id: 'apt-32', question: 'Find the next number: 1, 4, 9, 16, ?', options: ['20', '24', '25', '36'], answer: '25' },
-  { id: 'apt-33', question: 'If the price rises from 100 to 125, percentage increase is:', options: ['20%', '25%', '30%', '40%'], answer: '25%' },
-  { id: 'apt-34', question: 'Which word is different: Dog, Cat, Lion, Sparrow', options: ['Dog', 'Cat', 'Lion', 'Sparrow'], answer: 'Sparrow' },
-  { id: 'apt-35', question: 'The value of 2^5 is:', options: ['16', '25', '32', '64'], answer: '32' },
-  { id: 'apt-36', question: 'If 8 + 4 = 96 and 6 + 3 = 54, then 7 + 2 = ?', options: ['45', '56', '63', '72'], answer: '63' },
-  { id: 'apt-37', question: 'A cube has how many faces?', options: ['4', '6', '8', '12'], answer: '6' },
-  { id: 'apt-38', question: 'Choose the correctly spelled word.', options: ['Definately', 'Definitely', 'Definetly', 'Defiantly'], answer: 'Definitely' },
-  { id: 'apt-39', question: 'If 25% of x is 60, then x is:', options: ['180', '200', '220', '240'], answer: '240' },
-  { id: 'apt-40', question: 'The sum of angles in a triangle is:', options: ['90 degrees', '120 degrees', '180 degrees', '360 degrees'], answer: '180 degrees' },
-  { id: 'apt-41', question: 'A boat goes 18 km downstream in 2 hours. Downstream speed is:', options: ['6 km/h', '9 km/h', '12 km/h', '18 km/h'], answer: '9 km/h' },
-  { id: 'apt-42', question: 'Which comes next: Z, X, V, T, ?', options: ['R', 'S', 'U', 'W'], answer: 'R' },
-  { id: 'apt-43', question: 'If a:b = 5:7 and b = 35, then a is:', options: ['20', '25', '30', '40'], answer: '25' },
-  { id: 'apt-44', question: 'Convert 0.75 to a percentage.', options: ['7.5%', '25%', '75%', '750%'], answer: '75%' },
-  { id: 'apt-45', question: 'A class has 18 boys and 12 girls. Percentage of girls is:', options: ['30%', '35%', '40%', '45%'], answer: '40%' },
-];
+const APTITUDE_TOTAL = 40;
+const APTITUDE_PASS_MARK = 30;
 
-const codingQuestions = {
-  backend: [
-    {
-      id: 'be-1',
-      title: 'API Rate Limiter',
-      difficulty: 'Medium',
-      estimatedTime: '20 min',
-      languages: ['JavaScript', 'Python', 'Java'],
-      prompt: 'Design a function that processes user request timestamps and allows only five requests per user in a rolling sixty-second window.',
-      task: 'Return whether each request should be allowed or blocked while keeping the solution efficient for large input.',
-      constraints: [
-        'Up to 100000 requests may be processed.',
-        'Timestamps are provided in ascending order.',
-        'The rolling window is inclusive of the current request timestamp.',
-      ],
-      sampleCases: [
-        { label: 'Sample 1', input: 'userA: [1, 10, 20, 30, 40, 50]', output: '[true, true, true, true, true, false]', explanation: 'The sixth request falls within the same sixty-second window.' },
-        { label: 'Sample 2', input: 'userA: [1, 10, 20, 30, 40, 65]', output: '[true, true, true, true, true, true]', explanation: 'The oldest request at second 1 is outside the window when the request at 65 arrives.' },
-      ],
-      starterCode: {
-        JavaScript: 'function allowRequests(requests) {\n  // requests: [{ userId, timestamp }]\n  // return array of booleans\n}\n',
-        Python: 'def allow_requests(requests):\n    # requests: list of { userId, timestamp }\n    # return list[bool]\n    pass\n',
-        Java: 'class Solution {\n    public boolean[] allowRequests(Request[] requests) {\n        return new boolean[requests.length];\n    }\n}\n',
-      },
-    },
-    {
-      id: 'be-2',
-      title: 'Cursor Pagination',
-      difficulty: 'Medium',
-      estimatedTime: '18 min',
-      languages: ['JavaScript', 'Python', 'Java'],
-      prompt: 'You are given records sorted by createdAt descending. Build cursor-based pagination that returns the next page and the next cursor.',
-      task: 'Implement a function that accepts the full record list, a page size, and an optional cursor, then returns the page data plus the next cursor.',
-      constraints: [
-        'The solution should avoid offset-based assumptions.',
-        'The next cursor should allow the following page to start after the last item returned.',
-      ],
-      sampleCases: [
-        { label: 'Sample 1', input: 'records=[9,8,7,6], size=2, cursor=null', output: 'page=[9,8], nextCursor=8', explanation: 'The next page should begin after record 8.' },
-        { label: 'Sample 2', input: 'records=[9,8,7,6], size=2, cursor=8', output: 'page=[7,6], nextCursor=6', explanation: 'The cursor skips records already returned.' },
-      ],
-      starterCode: {
-        JavaScript: 'function paginate(records, pageSize, cursor = null) {\n  return { page: [], nextCursor: null };\n}\n',
-        Python: 'def paginate(records, page_size, cursor=None):\n    return { "page": [], "nextCursor": None }\n',
-        Java: 'class Solution {\n    public PageResult paginate(List<Record> records, int pageSize, String cursor) {\n        return new PageResult();\n    }\n}\n',
-      },
-    },
-    {
-      id: 'be-3',
-      title: 'Fix the Null Check Bug',
-      difficulty: 'Easy',
-      estimatedTime: '12 min',
-      languages: ['JavaScript', 'Java', 'Python'],
-      prompt: 'An API crashes when profile.address.city is missing. Write safer code that returns "Unknown" instead of throwing an error.',
-      task: 'Show the corrected implementation and explain why the original code fails.',
-      constraints: [
-        'Handle null, undefined, and missing nested objects.',
-        'Keep the implementation readable for production code review.',
-      ],
-      sampleCases: [
-        { label: 'Sample 1', input: 'profile = { address: { city: "Hyderabad" } }', output: '"Hyderabad"', explanation: 'The city is available, so the real value should be returned.' },
-        { label: 'Sample 2', input: 'profile = { }', output: '"Unknown"', explanation: 'Missing nested fields must not crash the API.' },
-      ],
-      starterCode: {
-        JavaScript: 'function getCity(profile) {\n  return "Unknown";\n}\n',
-        Java: 'class Solution {\n    public String getCity(Profile profile) {\n        return "Unknown";\n    }\n}\n',
-        Python: 'def get_city(profile):\n    return "Unknown"\n',
-      },
-    },
-  ],
-  frontend: [
-    {
-      id: 'fe-1',
-      title: 'React Search Filter',
-      difficulty: 'Medium',
-      estimatedTime: '18 min',
-      languages: ['JavaScript', 'TypeScript'],
-      prompt: 'Create a React component that filters a candidate list by name and designation without mutating the original array.',
-      task: 'Build the component and explain how state updates avoid mutation.',
-      constraints: [
-        'The original data array must remain unchanged.',
-        'Filtering should react immediately as the user types.',
-      ],
-      sampleCases: [
-        { label: 'Sample 1', input: 'search="an", designation="Backend"', output: 'Only backend candidates whose names include "an"', explanation: 'Both filters should be applied together.' },
-      ],
-      starterCode: {
-        JavaScript: 'export default function CandidateFilter({ candidates }) {\n  return null;\n}\n',
-        TypeScript: 'type Candidate = { name: string; designation: string };\nexport default function CandidateFilter({ candidates }: { candidates: Candidate[] }) {\n  return null;\n}\n',
-      },
-    },
-    {
-      id: 'fe-2',
-      title: 'Decode the Render Error',
-      difficulty: 'Easy',
-      estimatedTime: '12 min',
-      languages: ['JavaScript', 'TypeScript'],
-      prompt: 'A component maps over candidates but sometimes throws "Cannot read properties of undefined". Explain why and fix it defensively.',
-      task: 'Provide the corrected component and mention the edge case that caused the crash.',
-      constraints: [
-        'The fix should still render an empty state gracefully.',
-        'Do not mutate props.',
-      ],
-      sampleCases: [
-        { label: 'Sample 1', input: 'candidates = undefined', output: 'Render fallback UI instead of crashing', explanation: 'The component must handle undefined safely.' },
-      ],
-      starterCode: {
-        JavaScript: 'function CandidateList({ candidates }) {\n  return null;\n}\n',
-        TypeScript: 'type Candidate = { id: string; name: string };\nfunction CandidateList({ candidates }: { candidates?: Candidate[] }) {\n  return null;\n}\n',
-      },
-    },
-    {
-      id: 'fe-3',
-      title: 'Async Button State',
-      difficulty: 'Medium',
-      estimatedTime: '15 min',
-      languages: ['JavaScript', 'TypeScript'],
-      prompt: 'Write a submit button handler that prevents double submit, shows loading, calls an async API, and displays success or failure.',
-      task: 'Build the UI logic and include the button state transitions.',
-      constraints: [
-        'Multiple rapid clicks must not trigger duplicate API calls.',
-        'The user should see a clear loading and result state.',
-      ],
-      sampleCases: [
-        { label: 'Sample 1', input: 'User clicks twice quickly', output: 'Only one API call should execute', explanation: 'The loading state should block duplicate submission.' },
-      ],
-      starterCode: {
-        JavaScript: 'async function handleSubmit() {\n  // implement\n}\n',
-        TypeScript: 'async function handleSubmit(): Promise<void> {\n  // implement\n}\n',
-      },
-    },
-  ],
-  fullstack: [
-    {
-      id: 'fs-1',
-      title: 'Candidate Result Endpoint',
-      difficulty: 'Medium',
-      estimatedTime: '20 min',
-      languages: ['JavaScript', 'TypeScript'],
-      prompt: 'Design an endpoint that returns candidate details, aptitude score, pass status, and coding submissions by candidate ID.',
-      task: 'Write the backend route and explain the response shape expected by a frontend dashboard.',
-      constraints: [
-        'Handle missing candidate IDs with a proper error response.',
-        'Return structured JSON ready for frontend rendering.',
-      ],
-      sampleCases: [
-        { label: 'Sample 1', input: 'GET /api/results/12', output: 'Candidate profile plus assessment result JSON', explanation: 'The payload should include both registration and test details.' },
-      ],
-      starterCode: {
-        JavaScript: 'app.get("/api/results/:candidateId", async (req, res) => {\n  // implement\n});\n',
-        TypeScript: 'app.get("/api/results/:candidateId", async (req, res) => {\n  // implement\n});\n',
-      },
-    },
-    {
-      id: 'fs-2',
-      title: 'React Form Validation',
-      difficulty: 'Medium',
-      estimatedTime: '18 min',
-      languages: ['JavaScript', 'TypeScript'],
-      prompt: 'Create client and server validation for name, email, mobile number, designation, and resume upload.',
-      task: 'Show both the frontend validation flow and the backend guard clauses.',
-      constraints: [
-        'The same rules should be enforced on both client and server.',
-        'Validation messages should be clear for the user.',
-      ],
-      sampleCases: [
-        { label: 'Sample 1', input: 'email = invalid, resume = missing', output: 'Validation errors for both fields', explanation: 'The form should not submit until the required fields are valid.' },
-      ],
-      starterCode: {
-        JavaScript: 'function validateCandidateForm(values) {\n  return {};\n}\n',
-        TypeScript: 'type CandidateForm = { name: string; email: string; mobile: string; designation: string };\nfunction validateCandidateForm(values: CandidateForm) {\n  return {};\n}\n',
-      },
-    },
-    {
-      id: 'fs-3',
-      title: 'Debug Duplicate Emails',
-      difficulty: 'Medium',
-      estimatedTime: '16 min',
-      languages: ['SQL', 'JavaScript'],
-      prompt: 'Candidates are being inserted twice when the form is clicked quickly. Explain the issue and write a reliable fix.',
-      task: 'Describe the race condition and provide both a database-safe and application-safe solution.',
-      constraints: [
-        'Prevent duplicates even under concurrent requests.',
-        'Explain why frontend-only button disabling is not sufficient.',
-      ],
-      sampleCases: [
-        { label: 'Sample 1', input: 'Two requests with same email arrive nearly together', output: 'Only one candidate record should be created', explanation: 'The database constraint is the final protection layer.' },
-      ],
-      starterCode: {
-        SQL: '-- add a uniqueness constraint and safe insert logic here\n',
-        JavaScript: 'async function registerCandidate(payload) {\n  // implement\n}\n',
-      },
-    },
-  ],
-};
+const staticAptitudeQuestions = [
+  { id: 'static-1', question: 'Find the next number: 3, 9, 27, 81, ?', options: ['108', '162', '216', '243'], answer: '243' },
+  { id: 'static-2', question: 'Find the odd one: Apple, Mango, Carrot, Banana', options: ['Apple', 'Mango', 'Carrot', 'Banana'], answer: 'Carrot' },
+  { id: 'static-3', question: 'Find the next letters: AB, DE, GH, ?', options: ['IJ', 'JK', 'KL', 'LM'], answer: 'JK' },
+  { id: 'static-4', question: 'Which is the smallest fraction?', options: ['1/2', '2/3', '3/4', '4/5'], answer: '1/2' },
+  { id: 'static-5', question: 'If CODING is written as DPEJOH, then TEST is written as:', options: ['UFTU', 'SDRS', 'VGUW', 'UERT'], answer: 'UFTU' },
+  { id: 'static-6', question: 'The LCM of 12 and 18 is:', options: ['24', '30', '36', '72'], answer: '36' },
+  { id: 'static-7', question: 'The HCF of 48 and 60 is:', options: ['6', '8', '12', '16'], answer: '12' },
+  { id: 'static-8', question: 'What is the square root of 196?', options: ['12', '13', '14', '16'], answer: '14' },
+  { id: 'static-9', question: 'Choose the synonym of "Rapid".', options: ['Slow', 'Fast', 'Weak', 'Late'], answer: 'Fast' },
+  { id: 'static-10', question: 'Choose the antonym of "Expand".', options: ['Grow', 'Stretch', 'Contract', 'Increase'], answer: 'Contract' },
+  { id: 'static-11', question: 'Which number is divisible by both 3 and 5?', options: ['25', '30', '32', '42'], answer: '30' },
+  { id: 'static-12', question: 'Find the next number: 1, 4, 9, 16, ?', options: ['20', '24', '25', '36'], answer: '25' },
+  { id: 'static-13', question: 'Which word is different: Dog, Cat, Lion, Sparrow', options: ['Dog', 'Cat', 'Lion', 'Sparrow'], answer: 'Sparrow' },
+  { id: 'static-14', question: 'The value of 2^5 is:', options: ['16', '25', '32', '64'], answer: '32' },
+  { id: 'static-15', question: 'A cube has how many faces?', options: ['4', '6', '8', '12'], answer: '6' },
+  { id: 'static-16', question: 'Choose the correctly spelled word.', options: ['Definately', 'Definitely', 'Definetly', 'Defiantly'], answer: 'Definitely' },
+  { id: 'static-17', question: 'The sum of angles in a triangle is:', options: ['90 degrees', '120 degrees', '180 degrees', '360 degrees'], answer: '180 degrees' },
+  { id: 'static-18', question: 'Which comes next: Z, X, V, T, ?', options: ['R', 'S', 'U', 'W'], answer: 'R' },
+  { id: 'static-19', question: 'Convert 0.75 to a percentage.', options: ['7.5%', '25%', '75%', '750%'], answer: '75%' },
+];
 
 function shuffle(items) {
   return [...items].sort(() => Math.random() - 0.5);
 }
 
-function pickAptitudeQuestions() {
-  return shuffle(aptitudeQuestions).slice(0, 40).map(({ answer, ...question }) => question);
+function uniqueOptions(correct, distractors) {
+  const values = [correct, ...distractors].map(String);
+  return [...new Set(values)].slice(0, 4);
 }
 
-function gradeAptitude(answers) {
-  return aptitudeQuestions.reduce((score, question) => {
-    return answers[question.id] === question.answer ? score + 1 : score;
+function ensureFourOptions(correct, distractors) {
+  const options = uniqueOptions(correct, distractors);
+  let nextValue = Number(correct);
+
+  while (options.length < 4) {
+    nextValue += 1;
+    options.push(String(nextValue));
+  }
+
+  return shuffle(options);
+}
+
+function createQuestion(id, question, answer, distractors) {
+  return {
+    id,
+    question,
+    options: ensureFourOptions(answer, distractors),
+    answer: String(answer),
+  };
+}
+
+function range(start, end) {
+  return Array.from({ length: end - start + 1 }, (_, index) => start + index);
+}
+
+function buildGeneratedAptitudeQuestions() {
+  const generated = [];
+
+  range(1, 20).forEach((index) => {
+    const workers = 8 + index;
+    const days = 10 + index;
+    const fasterWorkers = workers + 4 + (index % 5);
+    const answer = Math.round((workers * days) / fasterWorkers);
+
+    generated.push(createQuestion(
+      `workers-${index}`,
+      `If ${workers} workers finish a job in ${days} days, how many days will ${fasterWorkers} workers take?`,
+      answer,
+      [answer - 2, answer + 2, answer + 4],
+    ));
+  });
+
+  range(1, 20).forEach((index) => {
+    const original = 80 + index * 10;
+    const percent = 10 + (index % 5) * 5;
+    const increased = original + ((original * percent) / 100);
+
+    generated.push(createQuestion(
+      `percent-rise-${index}`,
+      `A number increased by ${percent}% becomes ${increased}. What is the original number?`,
+      original,
+      [original - 20, original + 10, original + 20],
+    ));
+  });
+
+  range(1, 18).forEach((index) => {
+    const value = 120 + index * 8;
+    const percent = 15 + (index % 4) * 5;
+    const answer = (value * percent) / 100;
+
+    generated.push(createQuestion(
+      `percent-of-${index}`,
+      `What is ${percent}% of ${value}?`,
+      answer,
+      [answer - 8, answer + 4, answer + 12],
+    ));
+  });
+
+  range(1, 18).forEach((index) => {
+    const price = 300 + index * 25;
+    const discount = 5 + (index % 4) * 5;
+    const sellingPrice = price - ((price * discount) / 100);
+
+    generated.push(createQuestion(
+      `discount-${index}`,
+      `A shopkeeper marks an item at Rs. ${price} and gives ${discount}% discount. What is the selling price?`,
+      `Rs. ${sellingPrice}`,
+      [`Rs. ${sellingPrice - 20}`, `Rs. ${sellingPrice + 10}`, `Rs. ${sellingPrice + 25}`],
+    ));
+  });
+
+  range(1, 18).forEach((index) => {
+    const number = 160 + index * 10;
+    const percent = 10 + (index % 5) * 5;
+    const part = (number * percent) / 100;
+
+    generated.push(createQuestion(
+      `percent-find-${index}`,
+      `If ${percent}% of a number is ${part}, the number is:`,
+      number,
+      [number - 40, number + 20, number + 40],
+    ));
+  });
+
+  range(1, 16).forEach((index) => {
+    const boys = 12 + index * 2;
+    const girls = 8 + index;
+    const total = boys + girls;
+    const answer = Math.round((girls / total) * 100);
+
+    generated.push(createQuestion(
+      `girls-percent-${index}`,
+      `A class has ${boys} boys and ${girls} girls. What percentage of the class are girls?`,
+      `${answer}%`,
+      [`${answer - 5}%`, `${answer + 5}%`, `${answer + 10}%`],
+    ));
+  });
+
+  range(1, 16).forEach((index) => {
+    const start = 100 + index * 10;
+    const rise = 15 + (index % 4) * 5;
+    const end = start + ((start * rise) / 100);
+
+    generated.push(createQuestion(
+      `price-rise-${index}`,
+      `If the price rises from ${start} to ${end}, what is the percentage increase?`,
+      `${rise}%`,
+      [`${rise - 5}%`, `${rise + 5}%`, `${rise + 10}%`],
+    ));
+  });
+
+  range(1, 16).forEach((index) => {
+    const distance = 45 + index * 5;
+    const hours = 1 + (index % 3) * 0.5;
+    const answer = Math.round(distance / hours);
+
+    generated.push(createQuestion(
+      `speed-${index}`,
+      `A person travels ${distance} km in ${hours} hours. What is the speed?`,
+      `${answer} km/h`,
+      [`${answer - 10} km/h`, `${answer - 5} km/h`, `${answer + 5} km/h`],
+    ));
+  });
+
+  return generated;
+}
+
+const fullAptitudeQuestionBank = [
+  ...staticAptitudeQuestions,
+  ...buildGeneratedAptitudeQuestions(),
+];
+
+function pickAptitudeQuestions(total = APTITUDE_TOTAL) {
+  return shuffle(fullAptitudeQuestionBank).slice(0, total);
+}
+
+function sanitizeAptitudeQuestions(questions = []) {
+  return questions.map(({ answer, ...question }) => question);
+}
+
+function gradeAptitude(answers = {}, questions = []) {
+  return questions.reduce((score, question) => {
+    return String(answers[question.id] || '') === String(question.answer) ? score + 1 : score;
   }, 0);
 }
 
+const backendProblems = [
+  {
+    id: 'be-1',
+    title: 'Array Pair Sum',
+    difficulty: 'Medium',
+    estimatedTime: '20 min',
+    category: 'backend',
+    mode: 'runtime',
+    languages: ['JavaScript', 'Python', 'Java', 'C', 'C++'],
+    functionName: {
+      JavaScript: 'findPair',
+      Python: 'find_pair',
+      Java: 'findPair',
+      C: 'findPair',
+      'C++': 'findPair',
+    },
+    prompt: 'Given an array of integers and a target value, return the indices of any two numbers whose sum equals the target.',
+    task: 'Implement the function so that it returns a two-element array in ascending index order. Return an empty array when no valid pair exists.',
+    constraints: [
+      'Use zero-based indices.',
+      'Do not use the same element twice.',
+      'A correct solution should work efficiently on larger arrays.',
+    ],
+    publicCases: [
+      { label: 'Sample 1', input: { nums: [2, 7, 11, 15], target: 9 }, expected: [0, 1], explanation: '2 + 7 equals 9.' },
+      { label: 'Sample 2', input: { nums: [3, 2, 4], target: 6 }, expected: [1, 2], explanation: '2 + 4 equals 6.' },
+    ],
+    hiddenCases: [
+      { input: { nums: [1, 5, 3, 9], target: 8 }, expected: [0, 2] },
+      { input: { nums: [10, -2, 8, 5], target: 3 }, expected: [1, 3] },
+      { input: { nums: [4, 4], target: 8 }, expected: [0, 1] },
+    ],
+    starterCode: {
+      JavaScript: 'function findPair(nums, target) {\n  // return [index1, index2]\n  return [];\n}\n',
+      Python: 'def find_pair(nums, target):\n    # return [index1, index2]\n    return []\n',
+      Java: 'class Solution {\n    public int[] findPair(int[] nums, int target) {\n        return new int[0];\n    }\n}\n',
+      C: 'int* findPair(int nums[], int numsSize, int target, int* returnSize) {\n    *returnSize = 0;\n    return NULL;\n}\n',
+      'C++': 'vector<int> findPair(vector<int> nums, int target) {\n    return {};\n}\n',
+    },
+  },
+  {
+    id: 'be-2',
+    title: 'Group Anagrams',
+    difficulty: 'Medium',
+    estimatedTime: '22 min',
+    category: 'backend',
+    mode: 'runtime',
+    languages: ['JavaScript', 'Python', 'Java', 'C++'],
+    functionName: {
+      JavaScript: 'groupAnagrams',
+      Python: 'group_anagrams',
+      Java: 'groupAnagrams',
+      'C++': 'groupAnagrams',
+    },
+    prompt: 'Group words that are anagrams of each other.',
+    task: 'Return a list of groups. Each group should contain the original words that belong together. Sort each group alphabetically and sort the final list by the first word in each group.',
+    constraints: [
+      'Treat lowercase strings only.',
+      'Every input word must appear exactly once in the output.',
+      'Sort each group alphabetically before returning, and sort the final list by each group\'s first word.',
+    ],
+    publicCases: [
+      { label: 'Sample 1', input: { words: ['eat', 'tea', 'tan', 'ate', 'nat', 'bat'] }, expected: [['ate', 'eat', 'tea'], ['bat'], ['nat', 'tan']], explanation: 'Anagrams share the same sorted-character signature.' },
+      { label: 'Sample 2', input: { words: ['abc', 'bca', 'cab', 'foo'] }, expected: [['abc', 'bca', 'cab'], ['foo']], explanation: 'The three permutations of abc form one group.' },
+    ],
+    hiddenCases: [
+      { input: { words: ['listen', 'silent', 'enlist', 'google'] }, expected: [['enlist', 'listen', 'silent'], ['google']] },
+      { input: { words: ['rat', 'tar', 'art', 'car'] }, expected: [['art', 'rat', 'tar'], ['car']] },
+      { input: { words: ['a'] }, expected: [['a']] },
+    ],
+    starterCode: {
+      JavaScript: 'function groupAnagrams(words) {\n  // return an array of groups\n  return [];\n}\n',
+      Python: 'def group_anagrams(words):\n    # return a list of groups\n    return []\n',
+      Java: 'import java.util.*;\n\nclass Solution {\n    public List<List<String>> groupAnagrams(String[] words) {\n        return new ArrayList<>();\n    }\n}\n',
+      'C++': 'vector<vector<string>> groupAnagrams(vector<string> words) {\n    return {};\n}\n',
+    },
+  },
+  {
+    id: 'be-3',
+    title: 'Count Vowels',
+    difficulty: 'Easy',
+    estimatedTime: '15 min',
+    category: 'backend',
+    mode: 'runtime',
+    languages: ['JavaScript', 'Python', 'Java', 'C', 'C++'],
+    functionName: {
+      JavaScript: 'countVowels',
+      Python: 'count_vowels',
+      Java: 'countVowels',
+      C: 'countVowels',
+      'C++': 'countVowels',
+    },
+    prompt: 'Given a string, count how many vowels it contains.',
+    task: 'Return the total count of a, e, i, o, and u characters. The match should be case-insensitive.',
+    constraints: [
+      'Treat uppercase and lowercase vowels the same.',
+      'Only English vowels a, e, i, o, and u should be counted.',
+      'Return 0 when the string has no vowels.',
+    ],
+    publicCases: [
+      { label: 'Sample 1', input: { text: 'Tazviro Technologies' }, expected: 8, explanation: 'The string contains eight vowels.' },
+      { label: 'Sample 2', input: { text: 'Backend' }, expected: 2, explanation: 'The vowels are a and e.' },
+    ],
+    hiddenCases: [
+      { input: { text: 'AEIOUxyz' }, expected: 5 },
+      { input: { text: 'rhythm' }, expected: 0 },
+      { input: { text: 'Full Stack Developer' }, expected: 6 },
+    ],
+    starterCode: {
+      JavaScript: 'function countVowels(text) {\n  return 0;\n}\n',
+      Python: 'def count_vowels(text):\n    return 0\n',
+      Java: 'class Solution {\n    public int countVowels(String text) {\n        return 0;\n    }\n}\n',
+      C: 'int countVowels(const char* text) {\n    return 0;\n}\n',
+      'C++': 'int countVowels(string text) {\n    return 0;\n}\n',
+    },
+  },
+];
+
+const frontendProblems = [
+  {
+    id: 'fe-1',
+    title: 'Responsive Profile Card',
+    difficulty: 'Medium',
+    estimatedTime: '18 min',
+    category: 'frontend',
+    mode: 'markup',
+    languages: ['HTML/CSS'],
+    prompt: 'Build a responsive profile card with avatar, candidate name, role, and a CTA button.',
+    task: 'Write HTML and CSS in one editor. Use semantic markup and make the card stack neatly on small screens.',
+    constraints: [
+      'Include a root container with class `profile-card`.',
+      'Include candidate name, role text, and a button.',
+      'Use either `display: grid` or `display: flex` for layout.',
+    ],
+    publicCases: [
+      { label: 'Sample 1', input: 'Required sections', output: 'Card, name, role, CTA', explanation: 'The card should include core content blocks.' },
+    ],
+    hiddenCases: [
+      { checks: ['profile-card', '<button', 'display:'] },
+      { checks: ['profile-card', 'candidate-role', '@media'] },
+    ],
+    starterCode: {
+      'HTML/CSS': `<style>\n.profile-card {\n  /* add styles */\n}\n\n.candidate-role {\n  /* add styles */\n}\n</style>\n\n<section class="profile-card">\n  <img src="https://via.placeholder.com/96" alt="Candidate avatar" />\n  <div>\n    <h1>Candidate Name</h1>\n    <p class="candidate-role">Frontend Developer</p>\n    <button type="button">View profile</button>\n  </div>\n</section>\n`,
+    },
+  },
+  {
+    id: 'fe-2',
+    title: 'React Candidate Filter',
+    difficulty: 'Medium',
+    estimatedTime: '22 min',
+    category: 'frontend',
+    mode: 'react',
+    languages: ['JavaScript', 'TypeScript'],
+    prompt: 'Create a React component that filters candidate names as the user types.',
+    task: 'Render an input and a filtered list. The component should update immediately and show a fallback message when no items match.',
+    constraints: [
+      'Use React state for the search term.',
+      'Filter using a case-insensitive match.',
+      'Render a fallback like "No candidates found" when the filtered list is empty.',
+    ],
+    publicCases: [
+      { label: 'Sample 1', input: 'search = "an"', output: 'Shows only candidates whose names contain "an"', explanation: 'Filtering should be case-insensitive.' },
+    ],
+    hiddenCases: [
+      { checks: ['useState', 'filter(', 'toLowerCase', 'No candidates found'] },
+      { checks: ['<input', '.map(', 'search'] },
+    ],
+    starterCode: {
+      JavaScript: `import React, { useState } from 'react';\n\nconst candidates = ['Anu', 'Bharath', 'Deepa', 'Kiran'];\n\nexport default function CandidateFilter() {\n  const [search, setSearch] = useState('');\n\n  return (\n    <section>\n      <input\n        value={search}\n        onChange={(event) => setSearch(event.target.value)}\n        placeholder="Search candidates"\n      />\n    </section>\n  );\n}\n`,
+      TypeScript: `import React, { useState } from 'react';\n\nconst candidates: string[] = ['Anu', 'Bharath', 'Deepa', 'Kiran'];\n\nexport default function CandidateFilter(): JSX.Element {\n  const [search, setSearch] = useState('');\n\n  return (\n    <section>\n      <input\n        value={search}\n        onChange={(event) => setSearch(event.target.value)}\n        placeholder="Search candidates"\n      />\n    </section>\n  );\n}\n`,
+    },
+  },
+];
+
+function createTechnicalProblem(id, title, category, prompt, task, checks) {
+  return {
+    id,
+    title,
+    difficulty: 'Medium',
+    estimatedTime: '12 min',
+    category,
+    mode: 'technical',
+    languages: ['Answer'],
+    prompt,
+    task,
+    constraints: [
+      'Write a practical answer in your own words.',
+      'Mention tools, trade-offs, and real project considerations where relevant.',
+      'Your answer will be saved for admin review.',
+    ],
+    publicCases: [
+      {
+        label: 'Review focus',
+        input: 'Written technical answer',
+        expected: 'Clear role-specific concepts and practical reasoning',
+        explanation: 'The answer is checked for important concepts and remains available for manual review.',
+        checks,
+        minimumMatches: 2,
+      },
+    ],
+    hiddenCases: [
+      { checks, minimumMatches: 2 },
+    ],
+    starterCode: {
+      Answer: '',
+    },
+  };
+}
+
+const qaProblems = [
+  createTechnicalProblem(
+    'qa-1',
+    'Test Plan for Login Flow',
+    'qa',
+    'You need to test a login screen with email, password, validation messages, and forgot-password link.',
+    'Write the key functional, negative, edge-case, and regression test cases you would execute.',
+    ['positive', 'negative', 'validation', 'edge', 'regression', 'forgot', 'security'],
+  ),
+  createTechnicalProblem(
+    'qa-2',
+    'Bug Report Quality',
+    'qa',
+    'A user says the submit button sometimes creates two records.',
+    'Write a good bug report with steps to reproduce, expected result, actual result, severity, and useful evidence.',
+    ['steps', 'expected', 'actual', 'severity', 'screenshot', 'logs', 'reproduce'],
+  ),
+];
+
+const devopsProblems = [
+  createTechnicalProblem(
+    'devops-1',
+    'Deployment Pipeline',
+    'devops',
+    'Design a simple CI/CD pipeline for a Node.js and React application.',
+    'Explain build, test, environment variables, deployment, rollback, and monitoring steps.',
+    ['build', 'test', 'environment', 'deploy', 'rollback', 'monitoring', 'pipeline'],
+  ),
+  createTechnicalProblem(
+    'devops-2',
+    'Production Incident',
+    'devops',
+    'An API is returning 500 errors after a deployment.',
+    'Explain how you would investigate, mitigate, roll back if needed, and prevent the issue from recurring.',
+    ['logs', 'metrics', 'rollback', 'deploy', 'monitoring', 'root cause', 'alert'],
+  ),
+];
+
+const dataProblems = [
+  createTechnicalProblem(
+    'data-1',
+    'Candidate Funnel Metrics',
+    'data',
+    'You have candidate registration, aptitude score, and coding completion data.',
+    'Describe useful metrics, SQL/table assumptions, and how you would present insights to the hiring team.',
+    ['conversion', 'score', 'sql', 'dashboard', 'filter', 'trend', 'insight'],
+  ),
+  createTechnicalProblem(
+    'data-2',
+    'Data Cleaning Approach',
+    'data',
+    'Candidate data has duplicate emails, inconsistent mobile numbers, and missing designations.',
+    'Explain how you would clean, validate, deduplicate, and report data quality issues.',
+    ['duplicate', 'missing', 'validate', 'clean', 'deduplicate', 'quality', 'standardize'],
+  ),
+];
+
+const mobileProblems = [
+  createTechnicalProblem(
+    'mobile-1',
+    'Mobile App Offline Handling',
+    'mobile',
+    'A mobile assessment app must work when the network becomes unstable.',
+    'Explain how you would handle offline state, retries, local storage, sync, and user feedback.',
+    ['offline', 'retry', 'storage', 'sync', 'network', 'feedback', 'cache'],
+  ),
+  createTechnicalProblem(
+    'mobile-2',
+    'Mobile Performance Review',
+    'mobile',
+    'A screen with a long candidate list is slow on low-end devices.',
+    'Explain how you would diagnose and improve rendering, memory usage, and API loading.',
+    ['render', 'memory', 'pagination', 'lazy', 'cache', 'profile', 'performance'],
+  ),
+];
+
+const generalTechnicalProblems = [
+  createTechnicalProblem(
+    'tech-1',
+    'Role-Specific Technical Approach',
+    'technical',
+    'Describe how you would approach a real task in the role you applied for.',
+    'Include the tools you would use, the steps you would follow, risks you would watch for, and how you would verify quality.',
+    ['tools', 'steps', 'risk', 'quality', 'verify', 'test', 'deliver'],
+  ),
+  createTechnicalProblem(
+    'tech-2',
+    'Problem Solving Scenario',
+    'technical',
+    'You receive an unclear task from a manager with a short deadline.',
+    'Explain what questions you would ask, how you would break down the work, and how you would communicate progress.',
+    ['questions', 'deadline', 'priority', 'breakdown', 'communicate', 'progress', 'clarify'],
+  ),
+];
+
+const codingQuestions = {
+  backend: backendProblems,
+  frontend: frontendProblems,
+  qa: qaProblems,
+  devops: devopsProblems,
+  data: dataProblems,
+  mobile: mobileProblems,
+  technical: generalTechnicalProblems,
+  fullstack: [
+    { ...backendProblems[0], id: 'fs-be-1', title: 'Backend: Array Pair Sum' },
+    { ...frontendProblems[1], id: 'fs-fe-1', title: 'Frontend: React Candidate Filter' },
+  ],
+};
+
+function sanitizeCodingQuestion(question) {
+  const { hiddenCases, functionName, mode, category, ...rest } = question;
+  return {
+    ...rest,
+    mode,
+    category,
+    publicCases: (question.publicCases || []).map((item) => ({
+      label: item.label,
+      input: item.input,
+      output: item.expected ?? item.output,
+      explanation: item.explanation,
+    })),
+  };
+}
+
+function getQuestionSetKey(designation = '') {
+  const normalized = designation.toLowerCase();
+
+  if (normalized.includes('front') || normalized.includes('react') || normalized.includes('ui')) {
+    return 'frontend';
+  }
+
+  if (normalized.includes('full')) {
+    return 'fullstack';
+  }
+
+  if (normalized.includes('back') || normalized.includes('api') || normalized.includes('node') || normalized.includes('java') || normalized.includes('python')) {
+    return 'backend';
+  }
+
+  if (normalized.includes('qa') || normalized.includes('test') || normalized.includes('quality')) {
+    return 'qa';
+  }
+
+  if (normalized.includes('devops') || normalized.includes('cloud') || normalized.includes('aws') || normalized.includes('azure') || normalized.includes('sre')) {
+    return 'devops';
+  }
+
+  if (normalized.includes('data') || normalized.includes('analyst') || normalized.includes('machine') || normalized.includes('ml') || normalized.includes('ai')) {
+    return 'data';
+  }
+
+  if (normalized.includes('mobile') || normalized.includes('android') || normalized.includes('ios') || normalized.includes('flutter') || normalized.includes('react native')) {
+    return 'mobile';
+  }
+
+  return 'technical';
+}
+
 function getCodingQuestions(designation = '') {
-  const key = designation.toLowerCase().includes('front')
-    ? 'frontend'
-    : designation.toLowerCase().includes('full')
-      ? 'fullstack'
-      : 'backend';
+  const key = getQuestionSetKey(designation);
   return codingQuestions[key];
 }
 
-module.exports = { pickAptitudeQuestions, gradeAptitude, getCodingQuestions };
+function getCodingQuestionById(questionId) {
+  return Object.values(codingQuestions).flat()
+    .find((question) => question.id === questionId) || null;
+}
+
+module.exports = {
+  APTITUDE_PASS_MARK,
+  APTITUDE_TOTAL,
+  getCodingQuestionById,
+  getCodingQuestions,
+  gradeAptitude,
+  pickAptitudeQuestions,
+  sanitizeCodingQuestion,
+  sanitizeAptitudeQuestions,
+};
