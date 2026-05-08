@@ -305,6 +305,123 @@ async function readResponsePayload(response) {
   }
 }
 
+function formatDetailValue(value) {
+  if (value === undefined) {
+    return 'Not available';
+  }
+
+  if (value === null) {
+    return 'null';
+  }
+
+  return typeof value === 'string' ? value : JSON.stringify(value, null, 2);
+}
+
+function getAdminEvaluation(answer = {}) {
+  return answer.finalEvaluation || answer.evaluation || answer.lastRun || null;
+}
+
+function getAdminCodingRows(submissions = {}, questions = []) {
+  const questionMap = new Map((questions || []).map((question) => [question.id, question]));
+  const knownRows = (questions || []).map((question) => ({
+    id: question.id,
+    question,
+    answer: submissions?.[question.id] || {},
+  }));
+  const extraRows = Object.entries(submissions || {})
+    .filter(([id]) => !questionMap.has(id))
+    .map(([id, answer]) => ({ id, question: null, answer }));
+
+  return [...knownRows, ...extraRows];
+}
+
+function AdminCodingSubmission({ answer = {}, question = null, submissionId }) {
+  const evaluation = getAdminEvaluation(answer);
+  const passedCount = Number(evaluation?.passedCount || 0);
+  const totalCount = Number(evaluation?.totalCount || evaluation?.cases?.length || 0);
+  const failedCount = Math.max(totalCount - passedCount, 0);
+  const title = question?.title || `Question ${submissionId}`;
+  const code = answer.code || '';
+  const panes = answer.panes || null;
+  const notes = answer.notes || '';
+
+  return (
+    <article className="admin-answer-card">
+      <div className="admin-answer-top">
+        <div>
+          <h6>{title}</h6>
+          <p>{answer.language || evaluation?.language || question?.languages?.[0] || 'Language not recorded'}</p>
+        </div>
+        <div className="test-count-strip">
+          <span className="test-count-pass">{passedCount} passed</span>
+          <span className="test-count-fail">{failedCount} failed</span>
+          <span>{totalCount} total</span>
+        </div>
+      </div>
+
+      {question?.prompt && <p className="answer-prompt">{question.prompt}</p>}
+
+      {panes ? (
+        <div className="answer-pane-grid">
+          {['html', 'css', 'react'].map((paneName) => (
+            panes[paneName] ? (
+              <div className="answer-code-block" key={paneName}>
+                <span>{paneName.toUpperCase()}</span>
+                <pre>{panes[paneName]}</pre>
+              </div>
+            ) : null
+          ))}
+        </div>
+      ) : (
+        <div className="answer-code-block">
+          <span>Answer</span>
+          <pre>{code || 'No answer submitted.'}</pre>
+        </div>
+      )}
+
+      {notes && (
+        <div className="answer-notes">
+          <span>Notes</span>
+          <p>{notes}</p>
+        </div>
+      )}
+
+      {evaluation ? (
+        <div className="admin-test-list">
+          {(evaluation.cases || []).map((testCase, index) => (
+            <article
+              className={`admin-test-case ${testCase.passed ? 'test-pass' : 'test-fail'}`}
+              key={`${submissionId}-${testCase.label || index}`}
+            >
+              <div className="test-case-top">
+                <strong>{testCase.label || `Case ${index + 1}`}</strong>
+                <span>{testCase.passed ? 'Passed' : 'Failed'}</span>
+              </div>
+              <div className="test-detail-grid">
+                <div>
+                  <span>Input</span>
+                  <pre>{formatDetailValue(testCase.input)}</pre>
+                </div>
+                <div>
+                  <span>Expected</span>
+                  <pre>{formatDetailValue(testCase.expected)}</pre>
+                </div>
+                <div>
+                  <span>Actual</span>
+                  <pre>{formatDetailValue(testCase.actual)}</pre>
+                </div>
+              </div>
+              {testCase.error && <p className="warning-text">{testCase.error}</p>}
+            </article>
+          ))}
+        </div>
+      ) : (
+        <p className="empty-detail">No test-case result was saved for this answer.</p>
+      )}
+    </article>
+  );
+}
+
 function App() {
   const [screen, setScreen] = useState(() => getInitialScreenFromPath(window.location.pathname));
   const [form, setForm] = useState(initialForm);
@@ -1973,6 +2090,9 @@ function App() {
               {adminCandidates.map((item) => {
                 const candidateKey = item.attempt_id || item.candidate_id;
                 const isExpanded = expandedCandidateId === candidateKey;
+                const codingRows = isExpanded
+                  ? getAdminCodingRows(item.coding_submissions || {}, item.coding_questions || [])
+                  : [];
 
                 return (
                   <article className="candidate-result-card" key={candidateKey}>
@@ -2044,11 +2164,35 @@ function App() {
                       <div className="expanded-details">
                         <div className="details-block">
                           <h5>Coding answers</h5>
-                          <pre>{JSON.stringify(item.coding_submissions || {}, null, 2)}</pre>
+                          <div className="admin-answer-list">
+                            {codingRows.length ? (
+                              codingRows.map((submission) => (
+                                <AdminCodingSubmission
+                                  key={submission.id}
+                                  submissionId={submission.id}
+                                  question={submission.question}
+                                  answer={submission.answer}
+                                />
+                              ))
+                            ) : (
+                              <p className="empty-detail">No coding answers have been submitted yet.</p>
+                            )}
+                          </div>
                         </div>
                         <div className="details-block">
                           <h5>Question set</h5>
-                          <pre>{JSON.stringify(item.coding_questions || [], null, 2)}</pre>
+                          <div className="question-set-list">
+                            {(item.coding_questions || []).length ? (
+                              item.coding_questions.map((question, index) => (
+                                <article key={question.id || index}>
+                                  <strong>{question.title || `Question ${index + 1}`}</strong>
+                                  <p>{question.prompt || 'Prompt not recorded.'}</p>
+                                </article>
+                              ))
+                            ) : (
+                              <p className="empty-detail">No coding question set was saved yet.</p>
+                            )}
+                          </div>
                         </div>
                       </div>
                     )}
