@@ -7,7 +7,13 @@ const fs = require('fs');
 const multer = require('multer');
 const path = require('path');
 const { hashPassword, initDb, pool, verifyPassword } = require('./db');
-const { sendCandidateCompletionEmail, sendCandidateStartEmail } = require('./mailer');
+const {
+  getMailConfigStatus,
+  sendCandidateCompletionEmail,
+  sendCandidateStartEmail,
+  sendMail,
+  verifyMailTransport,
+} = require('./mailer');
 const { evaluateQuestion } = require('./codeRunner');
 const {
   APTITUDE_PASS_MARK,
@@ -39,10 +45,19 @@ const asyncRoute = (handler) => (req, res, next) => {
   Promise.resolve(handler(req, res, next)).catch(next);
 };
 
-const queueEmail = (task, label) => {
-  Promise.resolve(task()).catch((error) => {
-    console.error(`Failed to send ${label}:`, error.message || error);
-  });
+const trySendEmail = async (task, label) => {
+  try {
+    return await task();
+  } catch (error) {
+    console.error(`Failed to send ${label}:`, {
+      message: error.message,
+      code: error.code,
+      command: error.command,
+      response: error.response,
+      responseCode: error.responseCode,
+    });
+    return false;
+  }
 };
 
 const normalizeMimeType = (value) => {
@@ -432,7 +447,7 @@ app.post('/api/candidates', upload.single('resume'), asyncRoute(async (req, res)
     ],
   );
 
-  queueEmail(
+  const emailSent = await trySendEmail(
     () => sendCandidateStartEmail({
       name: candidate.rows[0].name,
       email: candidate.rows[0].email,
@@ -446,6 +461,7 @@ app.post('/api/candidates', upload.single('resume'), asyncRoute(async (req, res)
     candidate: candidate.rows[0],
     attempt: attempt.rows[0],
     aptitudeBypassed: shouldBypassAptitude,
+    emailSent,
   });
 }));
 
@@ -522,7 +538,7 @@ app.post('/api/attempts/:attemptId/aptitude', asyncRoute(async (req, res) => {
     );
 
     if (candidateResult.rowCount) {
-      queueEmail(
+      await trySendEmail(
         () => sendCandidateCompletionEmail(candidateResult.rows[0]),
         'candidate completion email',
       );
@@ -606,7 +622,7 @@ app.post('/api/attempts/:attemptId/coding', asyncRoute(async (req, res) => {
   );
 
   if (candidateResult.rowCount) {
-    queueEmail(
+    await trySendEmail(
       () => sendCandidateCompletionEmail(candidateResult.rows[0]),
       'candidate completion email',
     );
@@ -751,6 +767,42 @@ app.get('/api/admin/users', requireAdminAuth, asyncRoute(async (_req, res) => {
   `);
 
   res.json({ users: result.rows });
+}));
+
+app.get('/api/admin/mail/status', requireAdminAuth, asyncRoute(async (_req, res) => {
+  res.json(getMailConfigStatus());
+}));
+
+app.post('/api/admin/mail/test', requireAdminAuth, asyncRoute(async (req, res) => {
+  const to = (req.body.email || req.adminUser.username || '').trim().toLowerCase();
+
+  if (!to) {
+    return res.status(400).json({ message: 'A test recipient email is required.' });
+  }
+
+  const verified = await verifyMailTransport();
+  if (!verified.ok) {
+    return res.status(400).json(verified);
+  }
+
+  const sent = await trySendEmail(
+    () => sendMail({
+      to,
+      subject: 'Tazviro Technologies SMTP Test',
+      text: 'This is a test email from the Tazviro Technologies hiring portal.',
+      html: '<p>This is a test email from the <strong>Tazviro Technologies</strong> hiring portal.</p>',
+    }),
+    'admin SMTP test email',
+  );
+
+  if (!sent) {
+    return res.status(502).json({
+      message: 'SMTP credentials were loaded, but the test email could not be sent. Check backend logs for the provider response.',
+      config: getMailConfigStatus(),
+    });
+  }
+
+  res.json({ sent: true, to, config: getMailConfigStatus() });
 }));
 
 app.post('/api/admin/users', requireAdminAuth, asyncRoute(async (req, res) => {

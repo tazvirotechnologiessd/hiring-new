@@ -24,15 +24,61 @@ const transporter = isMailConfigured
 
 const fromAddress = () => `"${fromName}" <${fromEmail}>`;
 
+const getMailConfigStatus = () => ({
+  configured: isMailConfigured,
+  host: smtpHost,
+  port: smtpPort,
+  secure: smtpSecure,
+  user: smtpUser ? maskEmail(smtpUser) : null,
+  fromEmail: fromEmail ? maskEmail(fromEmail) : null,
+  fromName,
+});
+
+const maskEmail = (email = '') => {
+  const [name, domain] = email.split('@');
+  if (!name || !domain) {
+    return email ? '***' : '';
+  }
+
+  const visibleName = name.length <= 2 ? name[0] : `${name.slice(0, 2)}***`;
+  return `${visibleName}@${domain}`;
+};
+
+async function verifyMailTransport() {
+  if (!transporter) {
+    return {
+      ok: false,
+      message: 'SMTP is not configured. Set SMTP_USER, SMTP_PASS, and SMTP_FROM_EMAIL.',
+      config: getMailConfigStatus(),
+    };
+  }
+
+  await transporter.verify();
+
+  return {
+    ok: true,
+    message: 'SMTP connection verified.',
+    config: getMailConfigStatus(),
+  };
+}
+
 async function sendMail(message) {
   if (!transporter) {
     console.warn('SMTP is not configured. Skipping outgoing email.');
     return false;
   }
 
-  await transporter.sendMail({
+  const info = await transporter.sendMail({
     from: fromAddress(),
     ...message,
+  });
+
+  console.log('Email sent:', {
+    to: message.to,
+    messageId: info.messageId,
+    accepted: info.accepted,
+    rejected: info.rejected,
+    response: info.response,
   });
 
   return true;
@@ -141,6 +187,9 @@ async function sendCandidateCompletionEmail(candidate) {
 
 module.exports = {
   isMailConfigured,
+  getMailConfigStatus,
+  sendMail,
   sendCandidateStartEmail,
   sendCandidateCompletionEmail,
+  verifyMailTransport,
 };
